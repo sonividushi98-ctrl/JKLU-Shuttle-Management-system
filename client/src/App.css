@@ -1,38 +1,1296 @@
-.App {
-  text-align: center;
+/* ==========================================================================
+   JKLU Shuttle Management System - Apple Minimalism + RedBus Efficiency
+   ========================================================================== */
+
+:root {
+  --font-primary: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  
+  /* Apple Neutral Palette */
+  --apple-bg: #F8FAFC;
+  --apple-card: #FFFFFF;
+  --apple-text-primary: #0F172A;
+  --apple-text-secondary: #475569;
+  --apple-text-muted: #94A3B8;
+  --apple-border: rgba(15, 23, 42, 0.08);
+  --apple-border-strong: rgba(15, 23, 42, 0.16);
+  --apple-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --apple-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --apple-shadow-lg: 0 10px 25px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+  --apple-shadow-xl: 0 20px 35px -5px rgba(0, 0, 0, 0.10), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+  
+  /* RedBus Signature Accent */
+  --redbus-primary: #D82C36;
+  --redbus-hover: #BF1F29;
+  --redbus-light: #FEE2E2;
+  --redbus-dark: #991B1B;
+  
+  /* Supporting Accents */
+  --color-success: #10B981;
+  --color-success-bg: #ECFDF5;
+  --color-warning: #F59E0B;
+  --color-warning-bg: #FFFBEB;
+  --color-blue: #0284C7;
+  --color-blue-bg: #F0F9FF;
+  
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+  
+  --transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.App-logo {
-  height: 40vmin;
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-primary);
+  background-color: var(--apple-bg);
+  color: var(--apple-text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.5;
+}
+
+/* Glassmorphism Navigation */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  background: rgba(255, 255, 255, 0.85);
+  border-bottom: 1px solid var(--apple-border);
+  transition: var(--transition);
+}
+
+.header-container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.brand-badge {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.brand-logo-icon {
+  width: 42px;
+  height: 42px;
+  background: linear-gradient(135deg, var(--redbus-primary), #B91C1C);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(216, 44, 54, 0.3);
+}
+
+.brand-titles h1 {
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--apple-text-primary);
+  line-height: 1.1;
+}
+
+.brand-titles h1 span {
+  color: var(--redbus-primary);
+  font-weight: 900;
+}
+
+.brand-titles p {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--apple-text-muted);
+}
+
+/* Segmented Control / Apple Nav Tabs */
+.segmented-nav {
+  display: flex;
+  background: rgba(15, 23, 42, 0.05);
+  padding: 4px;
+  border-radius: var(--radius-full);
+  gap: 2px;
+}
+
+.segmented-nav-btn {
+  border: none;
+  background: transparent;
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--apple-text-secondary);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: var(--transition);
+}
+
+.segmented-nav-btn:hover {
+  color: var(--apple-text-primary);
+}
+
+.segmented-nav-btn.active {
+  background: #ffffff;
+  color: var(--apple-text-primary);
+  box-shadow: var(--apple-shadow-sm);
+}
+
+.badge-count {
+  background: var(--redbus-primary);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+}
+
+/* Operational Status Pill */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--color-success-bg);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #065F46;
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  background-color: var(--color-success);
+  border-radius: 50%;
+  animation: pulse-dot 2s infinite ease-in-out;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.85); }
+}
+
+/* Main Container */
+.main-wrapper {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 24px 20px 80px;
+}
+
+/* Hero Banner */
+.hero-card {
+  background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+  border-radius: var(--radius-xl);
+  padding: 32px;
+  color: #fff;
+  margin-bottom: 28px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--apple-shadow-lg);
+}
+
+.hero-card::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -10%;
+  width: 350px;
+  height: 350px;
+  background: radial-gradient(circle, rgba(216, 44, 54, 0.25) 0%, rgba(216, 44, 54, 0) 70%);
+  border-radius: 50%;
   pointer-events: none;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
+.hero-subtitle {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #F87171;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
+.hero-title {
+  font-size: 1.85rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+  margin-bottom: 12px;
+}
+
+.hero-desc {
+  font-size: 0.95rem;
+  color: #94A3B8;
+  max-width: 600px;
+  line-height: 1.6;
+}
+
+.stops-capsules {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.stop-capsule {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #F1F5F9;
+}
+
+.capsule-num {
+  background: var(--redbus-primary);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 800;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Stepper Bar */
+.stepper-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #ffffff;
+  padding: 16px 24px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--apple-border);
+  box-shadow: var(--apple-shadow-sm);
+  margin-bottom: 24px;
+}
+
+.step-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  opacity: 0.5;
+  transition: var(--transition);
+}
+
+.step-item.active {
+  opacity: 1;
+}
+
+.step-item.completed {
+  opacity: 0.85;
+}
+
+.step-bubble {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #F1F5F9;
+  color: var(--apple-text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+  transition: var(--transition);
+}
+
+.step-item.active .step-bubble {
+  background: var(--redbus-primary);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(216, 44, 54, 0.35);
+}
+
+.step-item.completed .step-bubble {
+  background: #0F172A;
+  color: #ffffff;
+}
+
+.step-meta h4 {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--apple-text-primary);
+}
+
+.step-meta p {
+  font-size: 0.72rem;
+  color: var(--apple-text-muted);
+}
+
+.step-connector {
+  flex: 1;
+  height: 2px;
+  background: #E2E8F0;
+  margin: 0 16px;
+  position: relative;
+}
+
+/* Filter Controls */
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.chips-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.chip-btn {
+  border: 1px solid var(--apple-border);
+  background: #ffffff;
+  color: var(--apple-text-secondary);
+  padding: 8px 16px;
+  border-radius: var(--radius-full);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: var(--transition);
+}
+
+.chip-btn:hover {
+  border-color: var(--apple-border-strong);
+  color: var(--apple-text-primary);
+}
+
+.chip-btn.active {
+  background: var(--apple-text-primary);
+  color: #ffffff;
+  border-color: var(--apple-text-primary);
+}
+
+/* Shuttle Cards Grid (RedBus Efficiency) */
+.shuttles-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.shuttle-card {
+  background: #ffffff;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--apple-border);
+  padding: 22px 24px;
+  display: grid;
+  grid-template-columns: 180px 1fr 220px;
+  align-items: center;
+  gap: 24px;
+  box-shadow: var(--apple-shadow-sm);
+  transition: var(--transition);
+  position: relative;
+  overflow: hidden;
+}
+
+.shuttle-card:hover {
+  border-color: rgba(216, 44, 54, 0.3);
+  box-shadow: var(--apple-shadow-md);
+  transform: translateY(-2px);
+}
+
+.shuttle-time-col {
+  border-right: 1px solid var(--apple-border);
+  padding-right: 16px;
+}
+
+.shuttle-dep-time {
+  font-size: 1.55rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--apple-text-primary);
+  line-height: 1.1;
+}
+
+.shuttle-period-pill {
+  display: inline-block;
+  background: #F1F5F9;
+  color: var(--apple-text-secondary);
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  margin-top: 6px;
+  text-transform: uppercase;
+}
+
+.shuttle-route-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.route-direction-badge {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--apple-text-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.route-stops-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: var(--apple-text-secondary);
+}
+
+.stop-tag {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.bus-meta-tags {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.75rem;
+  color: var(--apple-text-muted);
+}
+
+.bus-plate {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  background: #FEF3C7;
+  color: #92400E;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #FDE68A;
+}
+
+.shuttle-action-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.seats-counter-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+}
+
+.seats-counter-badge.available {
+  background: var(--color-success-bg);
+  color: #065F46;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.seats-counter-badge.few-left {
+  background: var(--redbus-light);
+  color: var(--redbus-dark);
+  border: 1px solid rgba(216, 44, 54, 0.2);
+}
+
+.select-shuttle-btn {
+  background: var(--redbus-primary);
+  color: #ffffff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: var(--radius-full);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: var(--transition);
+}
+
+.select-shuttle-btn:hover {
+  background: var(--redbus-hover);
+  box-shadow: 0 4px 12px rgba(216, 44, 54, 0.35);
+  transform: translateY(-1px);
+}
+
+/* Step 2: Stop Cards */
+.stops-selection-grid {
+  display: grid;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.stop-card {
+  background: #ffffff;
+  border: 2px solid var(--apple-border);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.stop-card:hover {
+  border-color: rgba(216, 44, 54, 0.4);
+  background: #FFFDFD;
+  transform: translateY(-2px);
+}
+
+.stop-card.selected {
+  border-color: var(--redbus-primary);
+  background: #FFF8F8;
+  box-shadow: 0 4px 16px rgba(216, 44, 54, 0.12);
+}
+
+.stop-card-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.stop-card-num {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #F1F5F9;
+  color: var(--apple-text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 1rem;
+  transition: var(--transition);
+}
+
+.stop-card.selected .stop-card-num {
+  background: var(--redbus-primary);
+  color: #ffffff;
+}
+
+.stop-name-title {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--apple-text-primary);
+  margin-bottom: 4px;
+}
+
+.stop-landmark-text {
+  font-size: 0.82rem;
+  color: var(--apple-text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.stop-desc-text {
+  font-size: 0.75rem;
+  color: var(--apple-text-muted);
+}
+
+.stop-eta-badge {
+  background: #F1F5F9;
+  border: 1px solid #E2E8F0;
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  text-align: right;
+}
+
+.stop-eta-time {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--apple-text-primary);
+}
+
+.stop-eta-label {
+  font-size: 0.68rem;
+  color: var(--apple-text-muted);
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+/* Step 3: RedBus Authentic Seating Layout */
+.seating-layout-section {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 24px;
+  align-items: start;
+}
+
+.bus-coach-container {
+  background: #ffffff;
+  border: 1px solid var(--apple-border);
+  border-radius: var(--radius-xl);
+  padding: 28px;
+  box-shadow: var(--apple-shadow-md);
+}
+
+.coach-outer-chassis {
+  background: #F8FAFC;
+  border: 2px solid #CBD5E1;
+  border-radius: 40px 40px 24px 24px;
+  padding: 24px 28px;
+  position: relative;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+/* Front Cabin */
+.cabin-front-header {
+  border-bottom: 2px dashed #CBD5E1;
+  padding-bottom: 16px;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.windshield-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--apple-text-muted);
+}
+
+.driver-seat-box {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  background: #1E293B;
+  color: #fff;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
+  font-size: 0.65rem;
+  font-weight: 700;
+  box-shadow: var(--apple-shadow-sm);
 }
 
-.App-link {
-  color: #61dafb;
+.entry-door-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #0284C7;
+  background: #F0F9FF;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px dashed #38BDF8;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
+/* Bus Rows Grid */
+.coach-seats-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.seat-row {
+  display: grid;
+  grid-template-columns: 46px 46px 1fr 46px 46px;
+  align-items: center;
+  gap: 8px;
+}
+
+.aisle-walkway {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #CBD5E1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Individual Seat Styling */
+.seat-btn {
+  width: 46px;
+  height: 48px;
+  background: #ffffff;
+  border: 1.5px solid #CBD5E1;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  transition: var(--transition);
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: #334155;
+  user-select: none;
+}
+
+.seat-btn::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 6px;
+  right: 6px;
+  height: 4px;
+  background: #E2E8F0;
+  border-radius: 2px;
+}
+
+.seat-btn:hover:not(.booked) {
+  border-color: var(--redbus-primary);
+  background: #FFF1F2;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(216, 44, 54, 0.2);
+}
+
+.seat-btn.selected {
+  background: var(--redbus-primary);
+  border-color: var(--redbus-primary);
+  color: #ffffff;
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(216, 44, 54, 0.4);
+}
+
+.seat-btn.selected::after {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.seat-btn.booked {
+  background: #E2E8F0;
+  border-color: #CBD5E1;
+  color: #94A3B8;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.seat-btn.booked::after {
+  background: #CBD5E1;
+}
+
+/* Legend */
+.seat-legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid #E2E8F0;
+  flex-wrap: wrap;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--apple-text-secondary);
+}
+
+.legend-box {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+}
+
+.legend-box.available {
+  background: #ffffff;
+  border: 1.5px solid #CBD5E1;
+}
+
+.legend-box.selected {
+  background: var(--redbus-primary);
+}
+
+.legend-box.booked {
+  background: #CBD5E1;
+}
+
+/* Booking Summary Card (Side Panel) */
+.booking-summary-card {
+  background: #ffffff;
+  border: 1px solid var(--apple-border);
+  border-radius: var(--radius-xl);
+  padding: 24px;
+  box-shadow: var(--apple-shadow-md);
+  position: sticky;
+  top: 90px;
+}
+
+.summary-header {
+  border-bottom: 1px solid var(--apple-border);
+  padding-bottom: 14px;
+  margin-bottom: 16px;
+}
+
+.summary-title {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--apple-text-primary);
+}
+
+.summary-detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  font-size: 0.85rem;
+  border-bottom: 1px dashed #F1F5F9;
+}
+
+.summary-label {
+  color: var(--apple-text-muted);
+}
+
+.summary-value {
+  font-weight: 700;
+  color: var(--apple-text-primary);
+}
+
+/* Passenger Input Fields */
+.passenger-form-group {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.input-field-wrapper label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--apple-text-secondary);
+  margin-bottom: 4px;
+}
+
+.apple-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--apple-border-strong);
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  font-family: var(--font-primary);
+  color: var(--apple-text-primary);
+  background: #F8FAFC;
+  transition: var(--transition);
+}
+
+.apple-input:focus {
+  outline: none;
+  background: #ffffff;
+  border-color: var(--redbus-primary);
+  box-shadow: 0 0 0 3px rgba(216, 44, 54, 0.15);
+}
+
+.confirm-booking-btn {
+  width: 100%;
+  margin-top: 20px;
+  background: var(--redbus-primary);
+  color: #ffffff;
+  border: none;
+  padding: 14px;
+  border-radius: var(--radius-full);
+  font-size: 0.95rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 14px rgba(216, 44, 54, 0.35);
+  transition: var(--transition);
+}
+
+.confirm-booking-btn:hover:not(:disabled) {
+  background: var(--redbus-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(216, 44, 54, 0.45);
+}
+
+.confirm-booking-btn:disabled {
+  background: #CBD5E1;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Step 4: Digital Boarding Pass (Apple Wallet / RedBus Ticket) */
+.ticket-wrapper {
+  max-width: 540px;
+  margin: 0 auto;
+}
+
+.apple-boarding-pass {
+  background: #ffffff;
+  border-radius: 24px;
+  border: 1px solid var(--apple-border);
+  box-shadow: var(--apple-shadow-xl);
+  overflow: hidden;
+  position: relative;
+}
+
+.pass-header {
+  background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+  color: #ffffff;
+  padding: 24px 28px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.pass-brand h3 {
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.pass-brand p {
+  font-size: 0.75rem;
+  color: #94A3B8;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.pass-status-pill {
+  background: rgba(16, 185, 129, 0.2);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: #34D399;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+}
+
+.pass-body {
+  padding: 24px 28px;
+}
+
+.pass-route-visual {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #F1F5F9;
+}
+
+.pass-stop-node {
+  max-width: 180px;
+}
+
+.pass-stop-node.right {
+  text-align: right;
+}
+
+.pass-node-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--apple-text-muted);
+}
+
+.pass-node-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--apple-text-primary);
+  line-height: 1.2;
+}
+
+.pass-details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.pass-field-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--apple-text-muted);
+}
+
+.pass-field-value {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--apple-text-primary);
+}
+
+.pass-seat-highlight {
+  color: var(--redbus-primary);
+  font-size: 1.2rem;
+}
+
+/* Perforated Divider */
+.pass-perforation {
+  display: flex;
+  align-items: center;
+  position: relative;
+  margin: 10px 0;
+}
+
+.notch-left, .notch-right {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--apple-bg);
+  position: absolute;
+  top: -12px;
+}
+
+.notch-left {
+  left: -12px;
+  box-shadow: inset -2px 0 3px rgba(0,0,0,0.06);
+}
+
+.notch-right {
+  right: -12px;
+  box-shadow: inset 2px 0 3px rgba(0,0,0,0.06);
+}
+
+.perforation-line {
+  width: 100%;
+  border-bottom: 2px dashed #CBD5E1;
+}
+
+.pass-footer-barcode {
+  padding: 24px 28px 30px;
+  background: #FAFBFD;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.qr-code-box {
+  background: #ffffff;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--apple-border);
+  box-shadow: var(--apple-shadow-sm);
+}
+
+.barcode-text {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #475569;
+  letter-spacing: 0.1em;
+}
+
+/* Pass Actions */
+.pass-actions-group {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.btn-secondary {
+  flex: 1;
+  background: #ffffff;
+  border: 1px solid var(--apple-border-strong);
+  color: var(--apple-text-primary);
+  padding: 12px;
+  border-radius: var(--radius-full);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: var(--transition);
+}
+
+.btn-secondary:hover {
+  background: #F8FAFC;
+  border-color: var(--apple-text-primary);
+}
+
+/* Route & Stops Tab Styling */
+.route-explorer-card {
+  background: #ffffff;
+  border: 1px solid var(--apple-border);
+  border-radius: var(--radius-xl);
+  padding: 32px;
+  box-shadow: var(--apple-shadow-sm);
+}
+
+.route-timeline {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  padding-left: 36px;
+  margin-top: 24px;
+}
+
+.route-timeline::before {
+  content: '';
+  position: absolute;
+  top: 14px;
+  bottom: 24px;
+  left: 11px;
+  width: 3px;
+  background: linear-gradient(180deg, #0F172A 0%, var(--redbus-primary) 100%);
+  border-radius: 2px;
+}
+
+.timeline-node {
+  position: relative;
+  margin-bottom: 32px;
+}
+
+.timeline-dot {
+  position: absolute;
+  left: -36px;
+  top: 4px;
+  width: 25px;
+  height: 25px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 4px solid var(--redbus-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.timeline-dot.origin {
+  border-color: #0F172A;
+}
+
+.timeline-content h4 {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--apple-text-primary);
+}
+
+.timeline-content p {
+  font-size: 0.85rem;
+  color: var(--apple-text-secondary);
+  margin-top: 4px;
+}
+
+/* My Passes Tab Cards */
+.trips-list {
+  display: grid;
+  gap: 16px;
+}
+
+.trip-card {
+  background: #ffffff;
+  border: 1px solid var(--apple-border);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: var(--apple-shadow-sm);
+  transition: var(--transition);
+}
+
+.trip-card:hover {
+  border-color: var(--apple-border-strong);
+  box-shadow: var(--apple-shadow-md);
+}
+
+/* Print Styles */
+@media print {
+  body {
+    background: #ffffff;
   }
-  to {
-    transform: rotate(360deg);
+  .app-header, .stepper-container, .pass-actions-group, .hero-card, .filter-bar {
+    display: none !important;
+  }
+  .ticket-wrapper {
+    max-width: 100%;
+    margin: 0;
+  }
+  .apple-boarding-pass {
+    box-shadow: none;
+    border: 1px solid #000;
+  }
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  .header-container {
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+  }
+  .segmented-nav {
+    overflow-x: auto;
+    width: 100%;
+  }
+  .shuttle-card {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .shuttle-time-col {
+    border-right: none;
+    border-bottom: 1px solid var(--apple-border);
+    padding-bottom: 12px;
+  }
+  .shuttle-action-col {
+    align-items: stretch;
+  }
+  .select-shuttle-btn {
+    width: 100%;
+    justify-content: center;
+  }
+  .seating-layout-section {
+    grid-template-columns: 1fr;
+  }
+  .stepper-container {
+    overflow-x: auto;
+  }
+  .step-connector {
+    min-width: 20px;
   }
 }

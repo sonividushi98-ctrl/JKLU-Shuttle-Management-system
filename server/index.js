@@ -19,10 +19,17 @@ app.get('/', (req, res) => {
   res.send('JKLU Shuttle Management System API is running...');
 });
 
-// MongoDB Connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/jklu_shuttle')
-  .then(() => console.log('Connected to MongoDB'))
-  .catch(err => console.error('Could not connect to MongoDB:', err));
+// MongoDB Connection with timeout handling
+const MONGO_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/jklu_shuttle';
+
+mongoose.connect(MONGO_URI, {
+  serverSelectionTimeoutMS: 3000,
+  connectTimeoutMS: 3000
+})
+  .then(() => console.log('✓ Connected to MongoDB successfully'))
+  .catch(err => {
+    console.warn('! MongoDB connection note: Operating in graceful standalone / memory mode (' + err.message + ')');
+  });
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
