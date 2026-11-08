@@ -12,7 +12,10 @@ app.use(express.json());
 
 // Routes
 const bookingRoutes = require('./routes/bookingRoutes');
+const authRoutes = require('./routes/authRoutes');
+
 app.use('/api/bookings', bookingRoutes);
+app.use('/api/auth', authRoutes);
 
 // Basic Route for testing
 app.get('/', (req, res) => {
