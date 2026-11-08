@@ -344,3 +344,52 @@ exports.cancelBooking = async (req, res) => {
     res.status(500).json({ message: 'Error cancelling booking', error: err.message });
   }
 };
+
+exports.getLiveTracking = async (req, res) => {
+  try {
+    const { busNumber } = req.params;
+    const cleanBus = decodeURIComponent(busNumber || 'RJ 14 PA 2024');
+
+    // Live driver info based on bus
+    const drivers = {
+      'RJ 14 PA 2024': { name: 'Rajesh Kumar Singh', phone: '+91 98290 41203', id: 'JKLU-DRV-08', exp: '9 Yrs' },
+      'RJ 14 PB 1102': { name: 'Mukesh Choudhary', phone: '+91 94140 88219', id: 'JKLU-DRV-12', exp: '12 Yrs' },
+      'RJ 14 PC 4410': { name: 'Vikram Shekhawat', phone: '+91 97850 55182', id: 'JKLU-DRV-03', exp: '7 Yrs' }
+    };
+
+    const driver = drivers[cleanBus] || {
+      name: 'Rajesh Kumar Singh',
+      phone: '+91 98290 41203',
+      id: 'JKLU-DRV-08',
+      exp: '9 Yrs'
+    };
+
+    // Realistic GPS snapshot
+    const trackingData = {
+      busNumber: cleanBus,
+      busType: 'JKLU AC Executive Shuttle',
+      driver,
+      status: 'En Route',
+      speedKmH: 42,
+      currentLocation: 'Ajmer Expressway, approaching DCM Junction',
+      currentStageIndex: 1, // 0: Origin, 1: Stop 1 to 2, 2: Stop 2 to 3, 3: Arrived
+      progressPercent: 55,
+      nextStop: 'Elements Mall',
+      etaNextStopMinutes: 4,
+      totalDistanceKm: 19.5,
+      distanceCoveredKm: 10.8,
+      lastGpsPing: new Date().toISOString(),
+      trafficCondition: 'Moderate - On Schedule',
+      stopsTimeline: [
+        { name: 'JKLU Campus (Gate 1)', status: 'Departed', time: 'Departed Gate 1 on schedule' },
+        { name: '200 feet bypass', status: 'Passed', time: 'Completed boarding/drop (~8 min ago)' },
+        { name: 'Elements Mall', status: 'Next Stop', time: 'ETA in ~4 mins (Next Stop)' },
+        { name: 'mansarovar metro station', status: 'Upcoming', time: 'ETA ~14 mins (Terminal Stop)' }
+      ]
+    };
+
+    return res.json(trackingData);
+  } catch (err) {
+    res.status(500).json({ message: 'Error retrieving live tracking data', error: err.message });
+  }
+};

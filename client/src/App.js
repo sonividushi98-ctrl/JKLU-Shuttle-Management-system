@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import axios from 'axios';
 import {
   Bus,
@@ -15,11 +15,22 @@ import {
   X,
   Compass,
   ArrowLeft,
-  Info
+  Info,
+  Radio,
+  Navigation,
+  Phone,
+  Play,
+  Pause,
+  RefreshCw,
+  Key,
+  LogIn,
+  LogOut,
+  ShieldCheck
 } from 'lucide-react';
 import './App.css';
 
 const API_BASE = 'http://localhost:5000/api/bookings';
+const AUTH_API = 'http://localhost:5000/api/auth';
 
 // Official JKLU 3 Shuttle Stops
 const JKLU_STOPS = [
@@ -150,7 +161,7 @@ const INITIAL_SLOTS = [
   }
 ];
 
-// Initial mock bookings
+// Initial mock trips
 const INITIAL_MY_TRIPS = [
   {
     _id: 'ticket-demo-01',
@@ -168,8 +179,52 @@ const INITIAL_MY_TRIPS = [
   }
 ];
 
+// Default driver profiles
+const BUS_DRIVERS = {
+  'RJ 14 PA 2024': { name: 'Rajesh Kumar Singh', phone: '+91 98290 41203', id: 'JKLU-DRV-08', exp: '9 Yrs Service' },
+  'RJ 14 PB 1102': { name: 'Mukesh Choudhary', phone: '+91 94140 88219', id: 'JKLU-DRV-12', exp: '12 Yrs Service' },
+  'RJ 14 PC 4410': { name: 'Vikram Shekhawat', phone: '+91 97850 55182', id: 'JKLU-DRV-03', exp: '7 Yrs Service' }
+};
+
 const App = () => {
-  // Navigation tabs: 'book', 'passes', 'route', 'timetable'
+  // ==========================================
+  // AUTHENTICATION & REMEMBER ME STATE
+  // ==========================================
+  const [currentUser, setCurrentUser] = useState(() => {
+    // 1. Check localStorage first (Remember Me enabled)
+    const localUser = localStorage.getItem('jklu_auth_user');
+    if (localUser) {
+      try { return JSON.parse(localUser); } catch { /* ignore */ }
+    }
+    // 2. Check sessionStorage
+    const sessionUser = sessionStorage.getItem('jklu_auth_user');
+    if (sessionUser) {
+      try { return JSON.parse(sessionUser); } catch { /* ignore */ }
+    }
+    // 3. Default pre-authenticated student for seamless initial experience
+    const defaultUser = {
+      id: 'user-jklu-default',
+      name: 'Aarav Sharma',
+      email: 'student@jklu.edu.in',
+      rollNumber: '2023BTECH042',
+      role: 'Student'
+    };
+    localStorage.setItem('jklu_auth_user', JSON.stringify(defaultUser));
+    return defaultUser;
+  });
+
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authMode, setAuthMode] = useState('login'); // 'login' | 'signup'
+  const [authName, setAuthName] = useState('');
+  const [authEmail, setAuthEmail] = useState('');
+  const [authRoll, setAuthRoll] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authRememberMe, setAuthRememberMe] = useState(true);
+  const [authError, setAuthError] = useState('');
+  const [authSuccess, setAuthSuccess] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+
+  // Navigation tabs: 'book' | 'passes' | 'tracking' | 'route' | 'timetable'
   const [currentTab, setCurrentTab] = useState('book');
   
   // Booking steps: 1: Select Shuttle, 2: Select Stop, 3: Select Seat & Passenger, 4: Boarding Pass
@@ -178,19 +233,28 @@ const App = () => {
   // Filter states
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [selectedPeriod, setSelectedPeriod] = useState('All');
-  const [directionFilter, setDirectionFilter] = useState('outbound'); // 'outbound' (Campus->City) or 'inbound' (City->Campus)
+  const [directionFilter, setDirectionFilter] = useState('outbound'); // 'outbound' or 'inbound'
 
   // Booking selections
   const [slots, setSlots] = useState(INITIAL_SLOTS);
   const [selectedSlot, setSelectedSlot] = useState(null);
-  const [selectedStop, setSelectedStop] = useState(JKLU_STOPS[2].name); // default to Mansarovar Metro
+  const [selectedStop, setSelectedStop] = useState(JKLU_STOPS[2].name); // default: Mansarovar Metro
   const [selectedSeat, setSelectedSeat] = useState(null);
-  const [bookedSeats, setBookedSeats] = useState([3, 7, 12, 18, 22]); // realistic pre-booked seats
+  const [bookedSeats, setBookedSeats] = useState([3, 7, 12, 18, 22]);
   
-  // Passenger Info
-  const [passengerName, setPassengerName] = useState('Aarav Sharma');
-  const [passengerRoll, setPassengerRoll] = useState('2023BTECH042');
-  const [passengerEmail, setPassengerEmail] = useState('aarav.sharma@jklu.edu.in');
+  // Passenger Info (syncs automatically with currentUser)
+  const [passengerName, setPassengerName] = useState(currentUser?.name || 'Aarav Sharma');
+  const [passengerRoll, setPassengerRoll] = useState(currentUser?.rollNumber || '2023BTECH042');
+  const [passengerEmail, setPassengerEmail] = useState(currentUser?.email || 'student@jklu.edu.in');
+
+  // Keep passenger info synced whenever currentUser updates
+  useEffect(() => {
+    if (currentUser) {
+      setPassengerName(currentUser.name || 'JKLU Student');
+      setPassengerRoll(currentUser.rollNumber || '2023BTECH001');
+      setPassengerEmail(currentUser.email || 'student@jklu.edu.in');
+    }
+  }, [currentUser]);
   
   // Trips and Active Confirmed Pass
   const [myTrips, setMyTrips] = useState(() => {
@@ -203,6 +267,37 @@ const App = () => {
   // Server connection status
   const [isServerOnline, setIsServerOnline] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // ==========================================
+  // LIVE BUS TRACKING STATE
+  // ==========================================
+  const [trackingBus, setTrackingBus] = useState('RJ 14 PA 2024');
+  const [trackingTrip, setTrackingTrip] = useState(null);
+  const [trackingProgress, setTrackingProgress] = useState(48); // % along corridor
+  const [trackingSpeed, setTrackingSpeed] = useState(42); // km/h
+  const [isTrackingSimulating, setIsTrackingSimulating] = useState(true);
+  const [trackingLastPing, setTrackingLastPing] = useState(new Date().toLocaleTimeString());
+
+  // Simulation timer for dynamic live bus movement along the corridor (runs when tracking tab is active)
+  const simTimerRef = useRef(null);
+  useEffect(() => {
+    if (isTrackingSimulating && currentTab === 'tracking') {
+      simTimerRef.current = setInterval(() => {
+        setTrackingProgress(prev => {
+          if (prev >= 98) return 5; // loop back smoothly
+          return prev + 1.2;
+        });
+        // Realistic micro-jitter in speed (38 - 46 km/h)
+        setTrackingSpeed(38 + Math.floor(Math.random() * 9));
+        setTrackingLastPing(new Date().toLocaleTimeString());
+      }, 1500);
+    } else {
+      if (simTimerRef.current) clearInterval(simTimerRef.current);
+    }
+    return () => {
+      if (simTimerRef.current) clearInterval(simTimerRef.current);
+    };
+  }, [isTrackingSimulating, currentTab]);
 
   // Sync trips to local storage
   useEffect(() => {
@@ -220,7 +315,6 @@ const App = () => {
         setSlots(INITIAL_SLOTS);
       }
     } catch {
-      // Graceful offline fallback
       setIsServerOnline(false);
       setSlots(INITIAL_SLOTS);
     }
@@ -239,15 +333,13 @@ const App = () => {
         return;
       }
     } catch {
-      // Fallback: check myTrips + deterministic mock booked seats
+      // Fallback
     }
 
-    // Local state calculation for booked seats
     const existing = myTrips
       .filter(t => (t.slot?._id === slotId || t.slotId === slotId) && t.date === date && t.status === 'Confirmed')
       .map(t => t.seatNumber);
     
-    // Add 4-6 realistic booked seats based on slot ID hash for realism
     const seed = (slotId?.charCodeAt?.(slotId.length - 1) || 5) % 4;
     const baseOccupied = [2, 5 + seed, 11, 16 + seed, 23];
     const combined = Array.from(new Set([...baseOccupied, ...existing]));
@@ -282,14 +374,14 @@ const App = () => {
 
     setIsSubmitting(true);
     const bookingPayload = {
-      userId: '654321098765432109876543',
+      userId: currentUser?.id || '654321098765432109876543',
       slotId: selectedSlot._id,
       stop: selectedStop,
       seatNumber: selectedSeat,
       date: selectedDate,
-      passengerName: passengerName.trim() || 'JKLU Student',
-      passengerRoll: passengerRoll.trim().toUpperCase() || '2023BTECH001',
-      passengerEmail: passengerEmail.trim() || 'student@jklu.edu.in'
+      passengerName: passengerName.trim() || currentUser?.name || 'JKLU Student',
+      passengerRoll: passengerRoll.trim().toUpperCase() || currentUser?.rollNumber || '2023BTECH001',
+      passengerEmail: passengerEmail.trim() || currentUser?.email || 'student@jklu.edu.in'
     };
 
     try {
@@ -298,9 +390,11 @@ const App = () => {
       setConfirmedPass(newBooking);
       setMyTrips(prev => [newBooking, ...prev]);
       setBookedSeats(prev => [...prev, selectedSeat]);
+      setTrackingBus(selectedSlot.busNumber || 'RJ 14 PA 2024');
+      setTrackingTrip(newBooking);
       setStep(4);
     } catch {
-      // Standalone / Offline successful creation
+      // Standalone fallback
       const localBooking = {
         _id: 'jklu-pass-' + Date.now(),
         ...bookingPayload,
@@ -312,11 +406,26 @@ const App = () => {
       setConfirmedPass(localBooking);
       setMyTrips(prev => [localBooking, ...prev]);
       setBookedSeats(prev => [...prev, selectedSeat]);
+      setTrackingBus(selectedSlot.busNumber || 'RJ 14 PA 2024');
+      setTrackingTrip(localBooking);
       setStep(4);
     } finally {
       setIsSubmitting(false);
       window.scrollTo({ top: 100, behavior: 'smooth' });
     }
+  };
+
+  // Launch live tracking for a particular trip / bus
+  const launchLiveTracking = (tripOrBus) => {
+    if (typeof tripOrBus === 'string') {
+      setTrackingBus(tripOrBus);
+      setTrackingTrip(null);
+    } else if (tripOrBus) {
+      setTrackingTrip(tripOrBus);
+      setTrackingBus(tripOrBus.slot?.busNumber || tripOrBus.busNumber || 'RJ 14 PA 2024');
+    }
+    setCurrentTab('tracking');
+    window.scrollTo({ top: 80, behavior: 'smooth' });
   };
 
   // Cancel booking
@@ -334,6 +443,115 @@ const App = () => {
     if (modalTrip?._id === tripId) {
       setModalTrip(prev => ({ ...prev, status: 'Cancelled' }));
     }
+  };
+
+  // ==========================================
+  // AUTHENTICATION LOGIC (JKLU.EDU.IN ONLY)
+  // ==========================================
+  const handleAuthSubmit = async (e) => {
+    e.preventDefault();
+    setAuthError('');
+    setAuthSuccess('');
+
+    const cleanEmail = authEmail.trim().toLowerCase();
+
+    // 1. Strict domain validation
+    if (!cleanEmail.endsWith('@jklu.edu.in')) {
+      setAuthError('Access Restricted: You must use an official @jklu.edu.in university email.');
+      return;
+    }
+
+    if (!authPassword) {
+      setAuthError('Please enter your password.');
+      return;
+    }
+
+    if (authMode === 'signup' && !authName.trim()) {
+      setAuthError('Please enter your full name.');
+      return;
+    }
+
+    setAuthLoading(true);
+
+    try {
+      const endpoint = authMode === 'signup' ? `${AUTH_API}/signup` : `${AUTH_API}/login`;
+      const payload = {
+        name: authName.trim(),
+        email: cleanEmail,
+        password: authPassword,
+        rollNumber: authRoll.trim().toUpperCase() || '2023BTECH001',
+        rememberMe: authRememberMe
+      };
+
+      const res = await axios.post(endpoint, payload, { timeout: 3500 });
+      const user = res.data.user;
+      const token = res.data.token;
+
+      // Handle "Remember Me": localStorage = persistent across days; sessionStorage = single session
+      if (authRememberMe) {
+        localStorage.setItem('jklu_auth_token', token);
+        localStorage.setItem('jklu_auth_user', JSON.stringify(user));
+        sessionStorage.removeItem('jklu_auth_user');
+      } else {
+        sessionStorage.setItem('jklu_auth_token', token);
+        sessionStorage.setItem('jklu_auth_user', JSON.stringify(user));
+        localStorage.removeItem('jklu_auth_user');
+      }
+
+      setCurrentUser(user);
+      setAuthSuccess(`Welcome, ${user.name}!`);
+      setTimeout(() => {
+        setShowAuthModal(false);
+        setAuthLoading(false);
+      }, 500);
+    } catch (err) {
+      // In offline / standalone mode fallback
+      const fallbackUser = {
+        id: 'user-' + Date.now(),
+        name: authName.trim() || cleanEmail.split('@')[0],
+        email: cleanEmail,
+        rollNumber: authRoll.trim().toUpperCase() || '2023BTECH001',
+        role: 'Student'
+      };
+
+      if (authRememberMe) {
+        localStorage.setItem('jklu_auth_user', JSON.stringify(fallbackUser));
+        localStorage.setItem('jklu_auth_token', 'mock-token-remember');
+      } else {
+        sessionStorage.setItem('jklu_auth_user', JSON.stringify(fallbackUser));
+      }
+
+      setCurrentUser(fallbackUser);
+      setAuthSuccess(`Welcome, ${fallbackUser.name}!`);
+      setTimeout(() => {
+        setShowAuthModal(false);
+        setAuthLoading(false);
+      }, 500);
+    }
+  };
+
+  // Quick 1-Tap Student Demo Login
+  const handleQuickDemoLogin = () => {
+    const demoUser = {
+      id: 'user-jklu-default',
+      name: 'Aarav Sharma',
+      email: 'student@jklu.edu.in',
+      rollNumber: '2023BTECH042',
+      role: 'Student'
+    };
+    localStorage.setItem('jklu_auth_user', JSON.stringify(demoUser));
+    localStorage.setItem('jklu_auth_token', 'demo-token-remember-30d');
+    setCurrentUser(demoUser);
+    setShowAuthModal(false);
+  };
+
+  // Sign out
+  const handleSignOut = () => {
+    localStorage.removeItem('jklu_auth_user');
+    localStorage.removeItem('jklu_auth_token');
+    sessionStorage.removeItem('jklu_auth_user');
+    sessionStorage.removeItem('jklu_auth_token');
+    setCurrentUser(null);
   };
 
   // Date shortcuts
@@ -365,11 +583,51 @@ const App = () => {
     return JKLU_STOPS.find(s => s.name === selectedStop) || JKLU_STOPS[2];
   }, [selectedStop]);
 
+  // Active driver for live tracking
+  const currentDriver = BUS_DRIVERS[trackingBus] || BUS_DRIVERS['RJ 14 PA 2024'];
+
+  // Calculate live tracking waypoint stages along the 19.5 km corridor
+  // Progress: 0% = Gate 1, 30% = 200 Feet Bypass, 65% = Elements Mall, 100% = Mansarovar Metro
+  const liveStageInfo = useMemo(() => {
+    if (trackingProgress < 28) {
+      return {
+        stageIndex: 0,
+        currentMilestone: 'Departed JKLU Gate 1, navigating Mahapura Expressway',
+        nextStop: '200 Feet Bypass',
+        etaNextMinutes: Math.max(1, Math.round(15 * (1 - trackingProgress / 28))),
+        passedStops: ['JKLU Campus (Gate 1)']
+      };
+    } else if (trackingProgress < 65) {
+      return {
+        stageIndex: 1,
+        currentMilestone: 'Crossed 200 Feet Bypass flyover, cruising on Ajmer Road',
+        nextStop: 'Elements Mall',
+        etaNextMinutes: Math.max(1, Math.round(10 * (1 - (trackingProgress - 28) / 37))),
+        passedStops: ['JKLU Campus (Gate 1)', '200 feet bypass']
+      };
+    } else if (trackingProgress < 94) {
+      return {
+        stageIndex: 2,
+        currentMilestone: 'Approaching DCM & Elements Mall connection',
+        nextStop: 'Mansarovar Metro Station',
+        etaNextMinutes: Math.max(1, Math.round(10 * (1 - (trackingProgress - 65) / 29))),
+        passedStops: ['JKLU Campus (Gate 1)', '200 feet bypass', 'Elements Mall']
+      };
+    } else {
+      return {
+        stageIndex: 3,
+        currentMilestone: 'Arrived at Mansarovar Metro Station terminal drop',
+        nextStop: 'Terminal Station (Arrived)',
+        etaNextMinutes: 0,
+        passedStops: ['JKLU Campus (Gate 1)', '200 feet bypass', 'Elements Mall', 'mansarovar metro station']
+      };
+    }
+  }, [trackingProgress]);
+
   // Render QR Code SVG
   const renderQRCode = (code) => (
     <svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
       <rect width="120" height="120" rx="10" fill="white" />
-      {/* Outer corner positioning boxes */}
       <rect x="12" y="12" width="28" height="28" rx="4" fill="#0F172A" />
       <rect x="18" y="18" width="16" height="16" fill="white" />
       <rect x="22" y="22" width="8" height="8" fill="#D82C36" />
@@ -382,7 +640,6 @@ const App = () => {
       <rect x="18" y="86" width="16" height="16" fill="white" />
       <rect x="22" y="90" width="8" height="8" fill="#D82C36" />
 
-      {/* Decorative QR matrix pattern */}
       <circle cx="50" cy="20" r="3" fill="#0F172A" />
       <circle cx="62" cy="20" r="3" fill="#0F172A" />
       <circle cx="56" cy="30" r="3" fill="#0F172A" />
@@ -442,6 +699,13 @@ const App = () => {
               )}
             </button>
             <button
+              className={`segmented-nav-btn ${currentTab === 'tracking' ? 'active' : ''}`}
+              onClick={() => setCurrentTab('tracking')}
+            >
+              <Radio size={15} color="#D82C36" />
+              Live Bus GPS
+            </button>
+            <button
               className={`segmented-nav-btn ${currentTab === 'route' ? 'active' : ''}`}
               onClick={() => setCurrentTab('route')}
             >
@@ -457,17 +721,46 @@ const App = () => {
             </button>
           </nav>
 
-          {/* Operations Pill */}
-          <div className="status-pill">
-            <span className="status-dot"></span>
-            <span>{isServerOnline ? 'JKLU API Synced' : 'Gate 1 Active • Express Ready'}</span>
+          {/* User Account / Remember Me Badge & Operations Status */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {currentUser ? (
+              <div className="user-profile-badge" onClick={() => setShowAuthModal(true)} title="JKLU University Profile">
+                <div className="user-avatar-circle">
+                  {currentUser.name ? currentUser.name.charAt(0).toUpperCase() : 'U'}
+                </div>
+                <div>
+                  <div className="user-name-label">{currentUser.name}</div>
+                  <div className="user-roll-tag">{currentUser.rollNumber || 'STUDENT'}</div>
+                </div>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleSignOut(); }}
+                  style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '2px', color: '#94A3B8' }}
+                  title="Sign Out"
+                >
+                  <LogOut size={13} />
+                </button>
+              </div>
+            ) : (
+              <button className="auth-btn-pill" onClick={() => setShowAuthModal(true)}>
+                <LogIn size={14} />
+                <span>Sign In (@jklu.edu.in)</span>
+              </button>
+            )}
+
+            {/* Operations Pill */}
+            <div className="status-pill">
+              <span className="status-dot"></span>
+              <span>{isServerOnline ? 'JKLU API Synced' : 'Gate 1 Active • Express Ready'}</span>
+            </div>
           </div>
         </div>
       </header>
 
       {/* Main Container */}
       <main className="main-wrapper">
+        {/* ========================================================================= */}
         {/* TAB 1: BOOKING WORKFLOW */}
+        {/* ========================================================================= */}
         {currentTab === 'book' && (
           <div>
             {/* Hero Minimal Banner */}
@@ -602,7 +895,6 @@ const App = () => {
                 {/* Shuttles List */}
                 <div className="shuttles-grid">
                   {filteredSlots.map(slot => {
-                    // Estimated available seats
                     const availableCount = slot.totalSeats - 6;
                     return (
                       <div key={slot._id} className="shuttle-card">
@@ -768,7 +1060,7 @@ const App = () => {
                         </div>
                       </div>
 
-                      {/* 2x2 Seating Rows Grid (RedBus Architecture) */}
+                      {/* 2x2 Seating Rows Grid */}
                       <div className="coach-seats-grid">
                         {Array.from({ length: Math.ceil(selectedSlot.totalSeats / 4) }).map((_, rowIdx) => {
                           const seat1 = rowIdx * 4 + 1;
@@ -778,7 +1070,6 @@ const App = () => {
 
                           return (
                             <div key={rowIdx} className="seat-row">
-                              {/* Left Window */}
                               <button
                                 className={`seat-btn ${selectedSeat === seat1 ? 'selected' : ''} ${bookedSeats.includes(seat1) ? 'booked' : ''}`}
                                 onClick={() => handleSeatClick(seat1)}
@@ -787,7 +1078,6 @@ const App = () => {
                                 {seat1}
                               </button>
 
-                              {/* Left Aisle */}
                               <button
                                 className={`seat-btn ${selectedSeat === seat2 ? 'selected' : ''} ${bookedSeats.includes(seat2) ? 'booked' : ''}`}
                                 onClick={() => handleSeatClick(seat2)}
@@ -796,12 +1086,10 @@ const App = () => {
                                 {seat2}
                               </button>
 
-                              {/* Center Walking Aisle */}
                               <div className="aisle-walkway">
                                 <span>Aisle</span>
                               </div>
 
-                              {/* Right Aisle */}
                               <button
                                 className={`seat-btn ${selectedSeat === seat3 ? 'selected' : ''} ${bookedSeats.includes(seat3) ? 'booked' : ''}`}
                                 onClick={() => handleSeatClick(seat3)}
@@ -810,7 +1098,6 @@ const App = () => {
                                 {seat3}
                               </button>
 
-                              {/* Right Window */}
                               <button
                                 className={`seat-btn ${selectedSeat === seat4 ? 'selected' : ''} ${bookedSeats.includes(seat4) ? 'booked' : ''}`}
                                 onClick={() => handleSeatClick(seat4)}
@@ -882,11 +1169,18 @@ const App = () => {
                       <span className="summary-value" style={{ color: '#10B981' }}>FREE (JKLU ID)</span>
                     </div>
 
-                    {/* Passenger Inputs */}
+                    {/* Passenger Inputs (auto-filled from persistent @jklu.edu.in auth) */}
                     <div className="passenger-form-group">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginTop: '6px' }}>
-                        <User size={15} color="#D82C36" />
-                        <span>Passenger Information</span>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '6px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', fontWeight: 700, color: '#334155' }}>
+                          <User size={15} color="#D82C36" />
+                          <span>Passenger Information</span>
+                        </div>
+                        {currentUser && (
+                          <span style={{ fontSize: '0.68rem', color: '#10B981', fontWeight: 700 }}>
+                            ● Auto-Filled ({currentUser.rollNumber})
+                          </span>
+                        )}
                       </div>
 
                       <div className="input-field-wrapper">
@@ -912,7 +1206,7 @@ const App = () => {
                       </div>
 
                       <div className="input-field-wrapper">
-                        <label>JKLU Email ID</label>
+                        <label>JKLU Email ID (@jklu.edu.in)</label>
                         <input
                           type="email"
                           className="apple-input"
@@ -947,7 +1241,7 @@ const App = () => {
               </div>
             )}
 
-            {/* STEP 4: APPLE WALLET / REDBUS DIGITAL BOARDING PASS */}
+            {/* STEP 4: APPLE WALLET / REDBUS DIGITAL BOARDING PASS WITH IMMEDIATE LIVE TRACKING */}
             {step === 4 && confirmedPass && (
               <div className="ticket-wrapper">
                 <div style={{ textAlign: 'center', marginBottom: '20px' }}>
@@ -958,8 +1252,36 @@ const App = () => {
                   <p style={{ fontSize: '0.85rem', color: '#64748B' }}>Your digital campus shuttle pass is ready</p>
                 </div>
 
+                {/* Primary High-Priority CTA: Track Live Shuttle Immediately */}
+                <div style={{ marginBottom: '18px' }}>
+                  <button
+                    onClick={() => launchLiveTracking(confirmedPass)}
+                    style={{
+                      width: '100%',
+                      background: 'linear-gradient(135deg, #D82C36 0%, #B91C1C 100%)',
+                      color: '#ffffff',
+                      border: 'none',
+                      padding: '14px 20px',
+                      borderRadius: '16px',
+                      fontSize: '0.98rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '10px',
+                      boxShadow: '0 6px 20px rgba(216, 44, 54, 0.4)',
+                      transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                    }}
+                  >
+                    <span className="radar-ping-dot" style={{ background: '#fff' }}></span>
+                    <Radio size={20} />
+                    <span>Track Live Shuttle Bus Now ({confirmedPass.slot?.busNumber || selectedSlot?.busNumber})</span>
+                    <ChevronRight size={18} />
+                  </button>
+                </div>
+
                 <div className="apple-boarding-pass">
-                  {/* Top Notch Header */}
                   <div className="pass-header">
                     <div className="pass-brand">
                       <h3>JKLU CAMPUS SHUTTLE</h3>
@@ -971,7 +1293,6 @@ const App = () => {
                   </div>
 
                   <div className="pass-body">
-                    {/* Visual Route */}
                     <div className="pass-route-visual">
                       <div className="pass-stop-node">
                         <div className="pass-node-label">ORIGIN</div>
@@ -995,7 +1316,6 @@ const App = () => {
                       </div>
                     </div>
 
-                    {/* Details Grid */}
                     <div className="pass-details-grid">
                       <div>
                         <div className="pass-field-label">DATE & TIME</div>
@@ -1021,14 +1341,12 @@ const App = () => {
                     </div>
                   </div>
 
-                  {/* Perforation divider with notched circular corners */}
                   <div className="pass-perforation">
                     <div className="notch-left"></div>
                     <div className="perforation-line"></div>
                     <div className="notch-right"></div>
                   </div>
 
-                  {/* QR Code and Barcode Section */}
                   <div className="pass-footer-barcode">
                     <div className="qr-code-box">
                       {renderQRCode(confirmedPass.bookingCode)}
@@ -1073,7 +1391,291 @@ const App = () => {
           </div>
         )}
 
-        {/* TAB 2: MY PASSES & TICKETS */}
+        {/* ========================================================================= */}
+        {/* TAB 2: LIVE BUS GPS TRACKING (Corridor + Telemetry + Real-time Movement) */}
+        {/* ========================================================================= */}
+        {currentTab === 'tracking' && (
+          <div className="live-tracking-panel">
+            {/* Top Tracking Bar */}
+            <div className="tracking-header-bar">
+              <div className="tracking-title-wrap">
+                <h3>
+                  <Bus size={24} color="#D82C36" />
+                  <span>Live GPS Tracking: {trackingBus}</span>
+                </h3>
+                <p style={{ fontSize: '0.8rem', color: '#94A3B8', marginTop: '4px' }}>
+                  Real-time satellite GPS tracking from JKLU Campus along Ajmer Road Transit Corridor
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div className="tracking-radar-tag">
+                  <span className="radar-ping-dot"></span>
+                  <span>GPS Active • Ping {trackingLastPing}</span>
+                </div>
+
+                {trackingTrip && (
+                  <button
+                    onClick={() => { setCurrentTab('book'); setStep(4); }}
+                    className="sim-action-btn"
+                  >
+                    <Ticket size={14} /> Back to Pass
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Next Stop Spotlight */}
+            <div className="next-stop-spotlight">
+              <div className="spotlight-left">
+                <div className="spotlight-bus-icon">
+                  <Navigation size={22} />
+                </div>
+                <div>
+                  <div className="spotlight-title">CURRENT STATUS & NEXT STOP</div>
+                  <div className="spotlight-stop-name">{liveStageInfo.nextStop}</div>
+                  <div style={{ fontSize: '0.78rem', color: '#64748B', marginTop: '2px' }}>
+                    {liveStageInfo.currentMilestone}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                {trackingTrip?.stop && (
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '0.7rem', color: '#94A3B8', textTransform: 'uppercase', fontWeight: 700 }}>Your Drop Stop</div>
+                    <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#D82C36' }}>{trackingTrip.stop}</div>
+                  </div>
+                )}
+                <div className="spotlight-countdown">
+                  <Clock size={16} />
+                  <span>ETA ~{liveStageInfo.etaNextMinutes} min</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Interactive Corridor Map Track */}
+            <div className="corridor-map-wrapper">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: '#64748B', letterSpacing: '0.08em' }}>
+                  Transit Corridor Map (Ajmer Road Highway)
+                </span>
+                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#D82C36' }}>
+                  {Math.round(trackingProgress)}% Route Completed
+                </span>
+              </div>
+
+              <div className="corridor-road-container">
+                {/* Background Road */}
+                <div className="corridor-track-bg">
+                  <div
+                    className="corridor-track-progress"
+                    style={{ width: `${Math.min(100, Math.max(5, trackingProgress))}%` }}
+                  ></div>
+                </div>
+
+                {/* Live Animated Bus Marker */}
+                <div
+                  className="corridor-bus-marker"
+                  style={{ left: `${Math.min(96, Math.max(4, trackingProgress))}%` }}
+                >
+                  <div className="bus-marker-bubble" title={`${trackingBus} - ${trackingSpeed} km/h`}>
+                    <Bus size={20} />
+                  </div>
+                  <div className="bus-live-tooltip">
+                    {trackingBus} • {trackingSpeed} km/h
+                  </div>
+                </div>
+
+                {/* 4 Stations: Origin + 3 Designated Stops */}
+                <div className="corridor-stops-row">
+                  {/* Origin */}
+                  <div className={`corridor-station-node ${trackingProgress > 4 ? 'completed' : 'active-stage'}`}>
+                    <div className="station-pin-dot">0</div>
+                    <div className="station-title">JKLU Campus</div>
+                    <div className="station-subtitle">Main Gate 1 (0 km)</div>
+                  </div>
+
+                  {/* Stop 1: 200 Feet Bypass */}
+                  <div className={`corridor-station-node ${trackingProgress >= 28 ? 'completed' : trackingProgress > 4 ? 'active-stage' : ''} ${trackingTrip?.stop === '200 feet bypass' ? 'user-destination' : ''}`}>
+                    <div className="station-pin-dot">1</div>
+                    <div className="station-title">200 Feet Bypass</div>
+                    <div className="station-subtitle">Heerapura (8.5 km)</div>
+                    {trackingTrip?.stop === '200 feet bypass' && (
+                      <span className="station-user-target-pill">Your Stop</span>
+                    )}
+                  </div>
+
+                  {/* Stop 2: Elements Mall */}
+                  <div className={`corridor-station-node ${trackingProgress >= 65 ? 'completed' : trackingProgress >= 28 ? 'active-stage' : ''} ${trackingTrip?.stop === 'Elements Mall' ? 'user-destination' : ''}`}>
+                    <div className="station-pin-dot">2</div>
+                    <div className="station-title">Elements Mall</div>
+                    <div className="station-subtitle">DCM Hub (14.0 km)</div>
+                    {trackingTrip?.stop === 'Elements Mall' && (
+                      <span className="station-user-target-pill">Your Stop</span>
+                    )}
+                  </div>
+
+                  {/* Stop 3: Mansarovar Metro Station */}
+                  <div className={`corridor-station-node ${trackingProgress >= 94 ? 'completed' : trackingProgress >= 65 ? 'active-stage' : ''} ${trackingTrip?.stop === 'mansarovar metro station' ? 'user-destination' : ''}`}>
+                    <div className="station-pin-dot">3</div>
+                    <div className="station-title">Mansarovar Metro</div>
+                    <div className="station-subtitle">Terminal (19.5 km)</div>
+                    {trackingTrip?.stop === 'mansarovar metro station' && (
+                      <span className="station-user-target-pill">Your Stop</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Simulation & GPS Refresh Controls */}
+              <div className="tracking-sim-controls">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: '#475569' }}>
+                  <ShieldCheck size={16} color="#10B981" />
+                  <span>Real-Time GPS Telemetry Stream</span>
+                </div>
+
+                <div className="sim-btn-group">
+                  <button
+                    className="sim-action-btn"
+                    onClick={() => setIsTrackingSimulating(!isTrackingSimulating)}
+                  >
+                    {isTrackingSimulating ? <Pause size={13} /> : <Play size={13} />}
+                    <span>{isTrackingSimulating ? 'Pause Movement' : 'Resume Simulation'}</span>
+                  </button>
+
+                  <button
+                    className="sim-action-btn"
+                    onClick={() => setTrackingProgress(prev => Math.min(95, prev + 25))}
+                  >
+                    <ArrowRight size={13} /> Advance Next Stop
+                  </button>
+
+                  <button
+                    className="sim-action-btn"
+                    onClick={() => { setTrackingProgress(8); setTrackingLastPing(new Date().toLocaleTimeString()); }}
+                  >
+                    <RefreshCw size={13} /> Reset to Gate 1
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Telemetry Dashboard Stats */}
+            <div className="telemetry-dashboard-grid">
+              <div className="telemetry-card">
+                <div className="telemetry-label">Live Speed</div>
+                <div className="telemetry-val" style={{ color: '#D82C36' }}>{trackingSpeed} km/h</div>
+                <div className="telemetry-sub">Cruise Speed on Highway</div>
+              </div>
+
+              <div className="telemetry-card">
+                <div className="telemetry-label">Distance Covered</div>
+                <div className="telemetry-val">{(19.5 * (trackingProgress / 100)).toFixed(1)} km</div>
+                <div className="telemetry-sub">of 19.5 km Total Route</div>
+              </div>
+
+              <div className="telemetry-card">
+                <div className="telemetry-label">Distance Remaining</div>
+                <div className="telemetry-val">{(19.5 * (1 - trackingProgress / 100)).toFixed(1)} km</div>
+                <div className="telemetry-sub">to Mansarovar Metro</div>
+              </div>
+
+              <div className="telemetry-card">
+                <div className="telemetry-label">Traffic Condition</div>
+                <div className="telemetry-val" style={{ color: '#10B981', fontSize: '1.15rem' }}>Smooth Flow</div>
+                <div className="telemetry-sub">Ajmer Expressway Green</div>
+              </div>
+            </div>
+
+            {/* Bottom Section: Driver Profile & Live Activity Feed */}
+            <div className="tracking-bottom-section">
+              {/* Driver Details Card */}
+              <div className="driver-info-card">
+                <div className="driver-profile-header">
+                  <div className="driver-avatar">
+                    {currentDriver.name.charAt(0)}
+                  </div>
+                  <div>
+                    <h4 style={{ fontSize: '1rem', fontWeight: 800 }}>{currentDriver.name}</h4>
+                    <p style={{ fontSize: '0.72rem', color: '#64748B' }}>
+                      Official JKLU Driver • {currentDriver.id}
+                    </p>
+                    <p style={{ fontSize: '0.7rem', color: '#10B981', fontWeight: 700, marginTop: '2px' }}>
+                      ● {currentDriver.exp}
+                    </p>
+                  </div>
+                </div>
+
+                <div style={{ fontSize: '0.78rem', color: '#475569', lineHeight: 1.5, background: '#fff', padding: '10px 12px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                  <div><strong>Vehicle Plate:</strong> {trackingBus}</div>
+                  <div><strong>Type:</strong> Executive AC Campus Express</div>
+                  <div><strong>Security Status:</strong> Gate 1 RFID Cleared</div>
+                </div>
+
+                <a
+                  href={`tel:${currentDriver.phone.replace(/\s+/g, '')}`}
+                  className="driver-contact-btn"
+                >
+                  <Phone size={14} />
+                  <span>Call Shuttle Driver ({currentDriver.phone})</span>
+                </a>
+              </div>
+
+              {/* Live Activity Feed */}
+              <div className="live-activity-log-card">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h4 style={{ fontSize: '0.95rem', fontWeight: 800 }}>Corridor Milestones & Activity</h4>
+                  <span style={{ fontSize: '0.72rem', color: '#10B981', fontWeight: 700 }}>● Live Feed</span>
+                </div>
+
+                <div className="activity-feed-list">
+                  <div className="activity-feed-item">
+                    <div className="activity-bullet passed"></div>
+                    <div>
+                      <div style={{ fontWeight: 700 }}>Gate 1 Departure (JKLU Campus)</div>
+                      <div style={{ fontSize: '0.72rem', color: '#64748B' }}>Shuttle boarded students and cleared campus gate security.</div>
+                    </div>
+                  </div>
+
+                  <div className="activity-feed-item">
+                    <div className={`activity-bullet ${trackingProgress >= 28 ? 'passed' : ''}`}></div>
+                    <div>
+                      <div style={{ fontWeight: 700 }}>Stop 1: 200 Feet Bypass (Heerapura)</div>
+                      <div style={{ fontSize: '0.72rem', color: '#64748B' }}>
+                        {trackingProgress >= 28 ? 'Crossed flyover and discharged designated passengers.' : 'Upcoming milestone (~8.5 km mark).'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="activity-feed-item">
+                    <div className={`activity-bullet ${trackingProgress >= 65 ? 'passed' : ''}`}></div>
+                    <div>
+                      <div style={{ fontWeight: 700 }}>Stop 2: Elements Mall (DCM Ajmer Road)</div>
+                      <div style={{ fontSize: '0.72rem', color: '#64748B' }}>
+                        {trackingProgress >= 65 ? 'Completed stop at DCM service lane.' : 'Next designated drop point.'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="activity-feed-item">
+                    <div className={`activity-bullet ${trackingProgress >= 94 ? 'passed' : ''}`}></div>
+                    <div>
+                      <div style={{ fontWeight: 700 }}>Stop 3: Mansarovar Metro Station Terminal</div>
+                      <div style={{ fontSize: '0.72rem', color: '#64748B' }}>
+                        {trackingProgress >= 94 ? 'Arrived at Jaipur Metro Gate 1 pillar.' : 'Final terminal stop with Pink Line metro connection.'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB 3: MY PASSES & TICKETS */}
+        {/* ========================================================================= */}
         {currentTab === 'passes' && (
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
@@ -1136,12 +1738,22 @@ const App = () => {
                         </div>
 
                         <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '2px' }}>
-                          Seat #{trip.seatNumber} • {trip.passengerName} ({trip.passengerRoll}) • Code: {trip.bookingCode}
+                          Seat #{trip.seatNumber} • {trip.passengerName} ({trip.passengerRoll}) • Bus: {trip.slot?.busNumber || 'RJ 14 PA 2024'}
                         </div>
                       </div>
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {/* Direct Live Track Button on Pass Card */}
+                      <button
+                        className="btn-secondary"
+                        onClick={() => launchLiveTracking(trip)}
+                        style={{ padding: '8px 14px', fontSize: '0.8rem', color: '#D82C36', borderColor: '#FCA5A5', background: '#FFF1F2' }}
+                      >
+                        <Radio size={14} />
+                        <span>Track Live</span>
+                      </button>
+
                       <button
                         className="btn-secondary"
                         onClick={() => setModalTrip(trip)}
@@ -1167,7 +1779,9 @@ const App = () => {
           </div>
         )}
 
-        {/* TAB 3: THE 3 STOPS ROUTE EXPLORER */}
+        {/* ========================================================================= */}
+        {/* TAB 4: THE 3 STOPS ROUTE EXPLORER */}
+        {/* ========================================================================= */}
         {currentTab === 'route' && (
           <div className="route-explorer-card">
             <div>
@@ -1181,7 +1795,6 @@ const App = () => {
             </div>
 
             <div className="route-timeline">
-              {/* Origin */}
               <div className="timeline-node">
                 <div className="timeline-dot origin">
                   <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#0F172A' }}></div>
@@ -1195,7 +1808,6 @@ const App = () => {
                 </div>
               </div>
 
-              {/* Stop 1 */}
               <div className="timeline-node">
                 <div className="timeline-dot">
                   <span style={{ fontSize: '10px', fontWeight: 800, color: '#D82C36' }}>1</span>
@@ -1210,7 +1822,6 @@ const App = () => {
                 </div>
               </div>
 
-              {/* Stop 2 */}
               <div className="timeline-node">
                 <div className="timeline-dot">
                   <span style={{ fontSize: '10px', fontWeight: 800, color: '#D82C36' }}>2</span>
@@ -1225,7 +1836,6 @@ const App = () => {
                 </div>
               </div>
 
-              {/* Stop 3 */}
               <div className="timeline-node" style={{ marginBottom: 0 }}>
                 <div className="timeline-dot">
                   <span style={{ fontSize: '10px', fontWeight: 800, color: '#D82C36' }}>3</span>
@@ -1245,7 +1855,9 @@ const App = () => {
           </div>
         )}
 
-        {/* TAB 4: COMPLETE SHUTTLE TIMETABLE */}
+        {/* ========================================================================= */}
+        {/* TAB 5: COMPLETE SHUTTLE TIMETABLE */}
+        {/* ========================================================================= */}
         {currentTab === 'timetable' && (
           <div style={{ background: '#ffffff', borderRadius: '24px', border: '1px solid var(--apple-border)', padding: '28px', boxShadow: 'var(--apple-shadow-sm)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -1311,7 +1923,191 @@ const App = () => {
         )}
       </main>
 
+      {/* ========================================================================= */}
+      {/* AUTH MODAL DIALOG (@jklu.edu.in ONLY + REMEMBER ME) */}
+      {/* ========================================================================= */}
+      {showAuthModal && (
+        <div className="auth-modal-overlay" onClick={() => setShowAuthModal(false)}>
+          <div className="auth-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="auth-modal-header">
+              <button
+                onClick={() => setShowAuthModal(false)}
+                style={{
+                  position: 'absolute',
+                  top: '18px',
+                  right: '18px',
+                  background: '#F1F5F9',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '28px',
+                  height: '28px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#64748B'
+                }}
+              >
+                <X size={15} />
+              </button>
+
+              <div className="auth-brand-strip">
+                <div style={{ width: '28px', height: '28px', background: '#D82C36', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+                  <Bus size={16} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800 }}>JKLU Campus Portal</h3>
+                  <p style={{ fontSize: '0.7rem', color: '#94A3B8', fontWeight: 600 }}>OFFICIAL UNIVERSITY ACCESS</p>
+                </div>
+              </div>
+
+              <div className="auth-tab-row">
+                <button
+                  className={`auth-tab-btn ${authMode === 'login' ? 'active' : ''}`}
+                  onClick={() => { setAuthMode('login'); setAuthError(''); setAuthSuccess(''); }}
+                >
+                  Sign In
+                </button>
+                <button
+                  className={`auth-tab-btn ${authMode === 'signup' ? 'active' : ''}`}
+                  onClick={() => { setAuthMode('signup'); setAuthError(''); setAuthSuccess(''); }}
+                >
+                  Register Account
+                </button>
+              </div>
+            </div>
+
+            <div className="auth-modal-body">
+              {/* Domain Restriction Notice */}
+              <div className="auth-hint-banner">
+                <ShieldCheck size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
+                <div>
+                  <strong>University ID Requirement:</strong> Only official emails ending in <code>@jklu.edu.in</code> are authorized for student & staff transport access.
+                </div>
+              </div>
+
+              {authError && (
+                <div style={{ background: '#FEE2E2', border: '1px solid #FCA5A5', color: '#991B1B', padding: '10px 14px', borderRadius: '10px', fontSize: '0.8rem', marginBottom: '14px', fontWeight: 600 }}>
+                  {authError}
+                </div>
+              )}
+
+              {authSuccess && (
+                <div style={{ background: '#ECFDF5', border: '1px solid #6EE7B7', color: '#065F46', padding: '10px 14px', borderRadius: '10px', fontSize: '0.8rem', marginBottom: '14px', fontWeight: 600 }}>
+                  {authSuccess}
+                </div>
+              )}
+
+              <form onSubmit={handleAuthSubmit}>
+                {authMode === 'signup' && (
+                  <>
+                    <div className="auth-input-group">
+                      <label>Full Name</label>
+                      <div className="auth-input-wrapper">
+                        <User size={16} className="auth-input-icon" />
+                        <input
+                          type="text"
+                          className="auth-text-input"
+                          placeholder="e.g. Aarav Sharma"
+                          value={authName}
+                          onChange={(e) => setAuthName(e.target.value)}
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="auth-input-group">
+                      <label>Roll Number / Staff ID</label>
+                      <div className="auth-input-wrapper">
+                        <Key size={16} className="auth-input-icon" />
+                        <input
+                          type="text"
+                          className="auth-text-input"
+                          placeholder="e.g. 2023BTECH042"
+                          value={authRoll}
+                          onChange={(e) => setAuthRoll(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                <div className="auth-input-group">
+                  <label>University Email Address</label>
+                  <div className="auth-input-wrapper">
+                    <User size={16} className="auth-input-icon" />
+                    <input
+                      type="email"
+                      className="auth-text-input"
+                      placeholder="student@jklu.edu.in"
+                      value={authEmail}
+                      onChange={(e) => setAuthEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <span style={{ fontSize: '0.68rem', color: '#64748B', marginTop: '4px', display: 'block' }}>
+                    Must end with <strong>@jklu.edu.in</strong>
+                  </span>
+                </div>
+
+                <div className="auth-input-group">
+                  <label>Password</label>
+                  <div className="auth-input-wrapper">
+                    <Key size={16} className="auth-input-icon" />
+                    <input
+                      type="password"
+                      className="auth-text-input"
+                      placeholder="••••••••"
+                      value={authPassword}
+                      onChange={(e) => setAuthPassword(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Remember Me Feature Toggle */}
+                <div className="remember-me-checkbox-row">
+                  <label className="custom-checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={authRememberMe}
+                      onChange={(e) => setAuthRememberMe(e.target.checked)}
+                    />
+                    <span>Remember me on this device (Never sign up daily)</span>
+                  </label>
+                </div>
+
+                <button
+                  type="submit"
+                  className="auth-submit-btn"
+                  disabled={authLoading}
+                >
+                  {authLoading ? 'Verifying...' : authMode === 'signup' ? 'Create University Account' : 'Sign In to Campus Shuttle'}
+                </button>
+              </form>
+
+              {/* 1-Tap Quick Demo Login for instant testing */}
+              <div className="quick-demo-login-box">
+                <p style={{ fontSize: '0.72rem', color: '#64748B', marginBottom: '8px' }}>
+                  Testing or evaluating the app?
+                </p>
+                <button
+                  type="button"
+                  className="quick-demo-btn"
+                  onClick={handleQuickDemoLogin}
+                >
+                  <Sparkles size={14} color="#D82C36" />
+                  <span>1-Tap Demo Student Login (Aarav Sharma)</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
       {/* POPUP MODAL FOR VIEWING PASS FROM "MY PASSES" */}
+      {/* ========================================================================= */}
       {modalTrip && (
         <div style={{
           position: 'fixed',
@@ -1419,11 +2215,24 @@ const App = () => {
             <div style={{ display: 'flex', gap: '10px', marginTop: '14px' }}>
               <button
                 className="btn-secondary"
+                onClick={() => {
+                  const bus = modalTrip.slot?.busNumber || 'RJ 14 PA 2024';
+                  setModalTrip(null);
+                  launchLiveTracking(modalTrip || bus);
+                }}
+                style={{ background: '#FFF1F2', color: '#D82C36', borderColor: '#FCA5A5' }}
+              >
+                <Radio size={15} /> Track Live GPS
+              </button>
+
+              <button
+                className="btn-secondary"
                 onClick={() => window.print()}
                 style={{ background: '#fff' }}
               >
                 <Download size={15} /> Print Pass
               </button>
+
               <button
                 className="btn-secondary"
                 onClick={() => setModalTrip(null)}

@@ -1294,3 +1294,765 @@ body {
     min-width: 20px;
   }
 }
+
+/* ==========================================================================
+   JKLU Auth System & User Profile Styles (Apple Minimalist)
+   ========================================================================== */
+
+.auth-btn-pill {
+  border: 1px solid var(--apple-border-strong);
+  background: #ffffff;
+  color: var(--apple-text-primary);
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  font-size: 0.8rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.auth-btn-pill:hover {
+  background: #F8FAFC;
+  border-color: var(--apple-text-primary);
+  transform: translateY(-1px);
+}
+
+.user-profile-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #ffffff;
+  border: 1px solid var(--apple-border);
+  padding: 4px 10px 4px 6px;
+  border-radius: var(--radius-full);
+  box-shadow: var(--apple-shadow-sm);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.user-profile-badge:hover {
+  border-color: var(--apple-border-strong);
+  box-shadow: var(--apple-shadow-md);
+}
+
+.user-avatar-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #0F172A, #334155);
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.user-name-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--apple-text-primary);
+  max-width: 110px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-roll-tag {
+  font-size: 0.68rem;
+  font-family: var(--font-mono);
+  background: #F1F5F9;
+  color: #475569;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+/* Auth Modal Dialog */
+.auth-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.auth-modal-card {
+  background: #ffffff;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--apple-border);
+  box-shadow: var(--apple-shadow-xl);
+  width: 100%;
+  max-width: 440px;
+  overflow: hidden;
+  position: relative;
+  animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px) scale(0.97); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+.auth-modal-header {
+  padding: 24px 28px 16px;
+  border-bottom: 1px solid var(--apple-border);
+  position: relative;
+}
+
+.auth-brand-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.auth-tab-row {
+  display: flex;
+  background: #F1F5F9;
+  padding: 4px;
+  border-radius: var(--radius-full);
+  margin-top: 14px;
+}
+
+.auth-tab-btn {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--apple-text-secondary);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.auth-tab-btn.active {
+  background: #ffffff;
+  color: var(--apple-text-primary);
+  box-shadow: var(--apple-shadow-sm);
+}
+
+.auth-modal-body {
+  padding: 24px 28px;
+}
+
+.auth-hint-banner {
+  background: #EFF6FF;
+  border: 1px solid #BFDBFE;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  font-size: 0.78rem;
+  color: #1E40AF;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 16px;
+  line-height: 1.4;
+}
+
+.auth-input-group {
+  margin-bottom: 14px;
+}
+
+.auth-input-group label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--apple-text-secondary);
+  margin-bottom: 6px;
+}
+
+.auth-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.auth-input-icon {
+  position: absolute;
+  left: 12px;
+  color: #94A3B8;
+  pointer-events: none;
+}
+
+.auth-text-input {
+  width: 100%;
+  padding: 10px 14px 10px 38px;
+  border: 1px solid var(--apple-border-strong);
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  font-family: var(--font-primary);
+  color: var(--apple-text-primary);
+  background: #F8FAFC;
+  transition: var(--transition);
+}
+
+.auth-text-input:focus {
+  outline: none;
+  background: #ffffff;
+  border-color: var(--redbus-primary);
+  box-shadow: 0 0 0 3px rgba(216, 44, 54, 0.15);
+}
+
+.remember-me-checkbox-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 16px 0;
+  font-size: 0.8rem;
+}
+
+.custom-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  color: var(--apple-text-secondary);
+  font-weight: 600;
+}
+
+.custom-checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--redbus-primary);
+  cursor: pointer;
+}
+
+.auth-submit-btn {
+  width: 100%;
+  background: var(--redbus-primary);
+  color: #ffffff;
+  border: none;
+  padding: 12px;
+  border-radius: var(--radius-full);
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(216, 44, 54, 0.3);
+  transition: var(--transition);
+}
+
+.auth-submit-btn:hover {
+  background: var(--redbus-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(216, 44, 54, 0.4);
+}
+
+.quick-demo-login-box {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--apple-border);
+  text-align: center;
+}
+
+.quick-demo-btn {
+  border: 1px dashed #CBD5E1;
+  background: #F8FAFC;
+  color: #334155;
+  padding: 6px 12px;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: var(--transition);
+}
+
+.quick-demo-btn:hover {
+  background: #EEF2F6;
+  border-color: #94A3B8;
+  color: #0F172A;
+}
+
+/* ==========================================================================
+   Live Shuttle Bus GPS Tracking View (Corridor + Telemetry)
+   ========================================================================== */
+
+.live-tracking-panel {
+  background: #ffffff;
+  border: 1px solid var(--apple-border);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow: var(--apple-shadow-lg);
+  margin-bottom: 30px;
+}
+
+/* Header bar for Live Tracking */
+.tracking-header-bar {
+  background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+  color: #ffffff;
+  padding: 24px 30px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.tracking-title-wrap h3 {
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tracking-radar-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: #34D399;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.radar-ping-dot {
+  width: 8px;
+  height: 8px;
+  background: #34D399;
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.7);
+  animation: radarWave 1.8s infinite cubic-bezier(0, 0, 0.2, 1);
+}
+
+@keyframes radarWave {
+  0% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.8); }
+  70% { box-shadow: 0 0 0 10px rgba(52, 211, 153, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+}
+
+/* Next Stop Spotlight Card */
+.next-stop-spotlight {
+  background: linear-gradient(135deg, #FFF1F2 0%, #FFF8F8 100%);
+  border-bottom: 1px solid #FFE4E6;
+  padding: 18px 30px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.spotlight-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.spotlight-bus-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: var(--redbus-primary);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(216, 44, 54, 0.25);
+}
+
+.spotlight-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--redbus-primary);
+  letter-spacing: 0.06em;
+}
+
+.spotlight-stop-name {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--apple-text-primary);
+}
+
+.spotlight-countdown {
+  background: #ffffff;
+  border: 1px solid rgba(216, 44, 54, 0.2);
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  font-weight: 800;
+  font-size: 0.85rem;
+  color: var(--redbus-primary);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: var(--apple-shadow-sm);
+}
+
+/* Interactive Corridor Road Map */
+.corridor-map-wrapper {
+  padding: 30px;
+  background: #FAFBFD;
+  border-bottom: 1px solid var(--apple-border);
+}
+
+.corridor-road-container {
+  position: relative;
+  margin: 40px 10px 50px;
+}
+
+.corridor-track-bg {
+  height: 8px;
+  background: #E2E8F0;
+  border-radius: var(--radius-full);
+  position: relative;
+}
+
+.corridor-track-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: linear-gradient(90deg, #10B981, var(--redbus-primary));
+  border-radius: var(--radius-full);
+  transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Bus Marker on Corridor Track */
+.corridor-bus-marker {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+  transition: left 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.bus-marker-bubble {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--redbus-primary);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid #ffffff;
+  box-shadow: 0 4px 14px rgba(216, 44, 54, 0.45);
+  cursor: pointer;
+  animation: busFloat 2.5s infinite ease-in-out;
+}
+
+@keyframes busFloat {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+
+.bus-live-tooltip {
+  position: absolute;
+  bottom: 48px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #0F172A;
+  color: #ffffff;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: var(--apple-shadow-md);
+  pointer-events: none;
+}
+
+.bus-live-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 5px;
+  border-style: solid;
+  border-color: #0F172A transparent transparent transparent;
+}
+
+/* 4 Stop Stations along Corridor */
+.corridor-stops-row {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  margin-top: -24px;
+}
+
+.corridor-station-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 140px;
+  text-align: center;
+  position: relative;
+}
+
+.station-pin-dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 4px solid #CBD5E1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: #475569;
+  z-index: 5;
+  transition: var(--transition);
+}
+
+.corridor-station-node.completed .station-pin-dot {
+  border-color: #10B981;
+  background: #10B981;
+  color: #ffffff;
+}
+
+.corridor-station-node.active-stage .station-pin-dot {
+  border-color: var(--redbus-primary);
+  background: #ffffff;
+  color: var(--redbus-primary);
+  box-shadow: 0 0 0 4px rgba(216, 44, 54, 0.2);
+}
+
+.corridor-station-node.user-destination .station-pin-dot {
+  border-color: #D82C36;
+  background: #FFF1F2;
+}
+
+.station-title {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--apple-text-primary);
+  margin-top: 10px;
+  line-height: 1.2;
+}
+
+.station-subtitle {
+  font-size: 0.7rem;
+  color: var(--apple-text-muted);
+  margin-top: 2px;
+}
+
+.station-user-target-pill {
+  margin-top: 6px;
+  background: #FEE2E2;
+  color: #991B1B;
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
+/* Simulation Controls Bar */
+.tracking-sim-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #F1F5F9;
+  padding: 10px 18px;
+  border-radius: var(--radius-md);
+  margin-top: 20px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.sim-btn-group {
+  display: flex;
+  gap: 8px;
+}
+
+.sim-action-btn {
+  border: 1px solid var(--apple-border-strong);
+  background: #ffffff;
+  color: var(--apple-text-primary);
+  padding: 6px 12px;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: var(--transition);
+}
+
+.sim-action-btn:hover {
+  background: #0F172A;
+  color: #ffffff;
+  border-color: #0F172A;
+}
+
+/* Telemetry Grid */
+.telemetry-dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  padding: 24px 30px;
+}
+
+.telemetry-card {
+  background: #ffffff;
+  border: 1px solid var(--apple-border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  box-shadow: var(--apple-shadow-sm);
+}
+
+.telemetry-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--apple-text-muted);
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+
+.telemetry-val {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--apple-text-primary);
+  line-height: 1.1;
+}
+
+.telemetry-sub {
+  font-size: 0.72rem;
+  color: var(--apple-text-secondary);
+  margin-top: 4px;
+}
+
+/* Driver & Activity Columns */
+.tracking-bottom-section {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 20px;
+  padding: 0 30px 30px;
+}
+
+.driver-info-card {
+  background: #F8FAFC;
+  border: 1px solid var(--apple-border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+}
+
+.driver-profile-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.driver-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #1E293B;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 1.1rem;
+}
+
+.driver-contact-btn {
+  width: 100%;
+  margin-top: 14px;
+  background: #ffffff;
+  border: 1px solid var(--apple-border-strong);
+  color: var(--apple-text-primary);
+  padding: 9px;
+  border-radius: var(--radius-full);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: var(--transition);
+}
+
+.driver-contact-btn:hover {
+  background: #0F172A;
+  color: #ffffff;
+  border-color: #0F172A;
+}
+
+.live-activity-log-card {
+  background: #F8FAFC;
+  border: 1px solid var(--apple-border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+}
+
+.activity-feed-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.activity-feed-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 0.8rem;
+}
+
+.activity-bullet {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--redbus-primary);
+  margin-top: 5px;
+  flex-shrink: 0;
+}
+
+.activity-bullet.passed {
+  background: #10B981;
+}
+
+@media (max-width: 840px) {
+  .telemetry-dashboard-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .tracking-bottom-section {
+    grid-template-columns: 1fr;
+  }
+  .corridor-stops-row {
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+}

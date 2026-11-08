@@ -9,5 +9,6 @@ router.get('/my-trips/:userId', bookingController.getMyTrips);
 router.post('/cancel/:bookingId', bookingController.cancelBooking);
 router.delete('/:bookingId', bookingController.cancelBooking);
 router.get('/stops', bookingController.getStops);
+router.get('/track/:busNumber', bookingController.getLiveTracking);
 
 module.exports = router;
