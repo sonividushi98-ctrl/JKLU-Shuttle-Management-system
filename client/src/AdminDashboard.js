@@ -201,12 +201,16 @@ const AdminDashboard = ({ onUnauthorized }) => {
   const slots = load?.slots || [];
   const totals = slots.reduce(
     (acc, s) => {
+      if (s.cancelled) {
+        acc.cancelled += 1;
+        return acc;
+      }
       acc.booked += s.bookedSeats;
       acc.seats += s.totalSeats;
       if (loadInfo(s).isNearlyFull || loadInfo(s).isFull) acc.busy += 1;
       return acc;
     },
-    { booked: 0, seats: 0, busy: 0 }
+    { booked: 0, seats: 0, busy: 0, cancelled: 0 }
   );
 
   return (
@@ -302,6 +306,7 @@ const AdminDashboard = ({ onUnauthorized }) => {
           {load && (
             <p className="admin-stats">
               <strong>{totals.booked}</strong> of {totals.seats} seats booked · <strong>{totals.busy}</strong> nearly full or full
+              {totals.cancelled > 0 && <> · <strong>{totals.cancelled}</strong> cancelled</>}
             </p>
           )}
         </div>
@@ -325,7 +330,7 @@ const AdminDashboard = ({ onUnauthorized }) => {
             {slots.map((slot) => {
               const info = loadInfo(slot);
               return (
-                <li key={slot._id} className={`admin-slot ${slot.runsOnDate ? '' : 'admin-slot-off'}`}>
+                <li key={slot._id} className={`admin-slot ${slot.runsOnDate && !slot.cancelled ? '' : 'admin-slot-off'}`}>
                   <div className="admin-slot-main">
                     <div className="admin-slot-time">{slot.time}</div>
                     <div className="admin-slot-meta">
@@ -333,13 +338,15 @@ const AdminDashboard = ({ onUnauthorized }) => {
                       <span>{slot.period} · {slot.busType}</span>
                     </div>
                     <div className="admin-badges">
-                      {info.isFull && <span className="admin-badge admin-badge-full">Full</span>}
-                      {info.isNearlyFull && <span className="admin-badge admin-badge-warn">Nearly full</span>}
+                      {slot.cancelled && <span className="admin-badge admin-badge-full">Cancelled for this date</span>}
+                      {!slot.cancelled && info.isFull && <span className="admin-badge admin-badge-full">Full</span>}
+                      {!slot.cancelled && info.isNearlyFull && <span className="admin-badge admin-badge-warn">Nearly full</span>}
                       {!slot.runsOnDate && <span className="admin-badge admin-badge-muted">Not scheduled on {load.weekday}</span>}
                       {slot.cancelledByAdmin > 0 && (
-                        <span className="admin-badge admin-badge-cancel">{slot.cancelledByAdmin} cancelled by admin</span>
+                        <span className="admin-badge admin-badge-cancel">{slot.cancelledByAdmin} booking{slot.cancelledByAdmin === 1 ? '' : 's'} cancelled</span>
                       )}
                     </div>
+                    {slot.cancelled && <div className="admin-slot-reason">Reason: {slot.cancelReason}</div>}
                   </div>
 
                   <div className="admin-slot-load">
@@ -367,9 +374,14 @@ const AdminDashboard = ({ onUnauthorized }) => {
                       <Users size={15} />
                       <span>Passengers</span>
                     </button>
-                    <button type="button" className="admin-btn admin-btn-danger" onClick={() => openCancel(slot)}>
+                    <button
+                      type="button"
+                      className="admin-btn admin-btn-danger"
+                      onClick={() => openCancel(slot)}
+                      disabled={slot.cancelled}
+                    >
                       <XCircle size={15} />
-                      <span>Cancel shuttle</span>
+                      <span>{slot.cancelled ? 'Cancelled' : 'Cancel shuttle'}</span>
                     </button>
                   </div>
                 </li>
@@ -498,7 +510,8 @@ const AdminDashboard = ({ onUnauthorized }) => {
                   <div>
                     <p>
                       This cancels <strong>all {cancelTarget.bookedSeats} confirmed booking{cancelTarget.bookedSeats === 1 ? '' : 's'}</strong> on{' '}
-                      <strong>{formatDate(date)}</strong> for this shuttle. It cannot be undone.
+                      <strong>{formatDate(date)}</strong> for this shuttle, and students won&apos;t be able to book it on
+                      that date. It cannot be undone.
                     </p>
                     <p className="admin-confirm-reason">Students will see: “Cancelled by admin: {cancelReason.trim()}”</p>
                   </div>

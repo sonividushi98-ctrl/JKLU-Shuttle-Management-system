@@ -364,6 +364,65 @@
   color: var(--redbus-dark);
 }
 
+.admin-slot-reason {
+  margin-top: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--redbus-dark);
+}
+
+/* Booking page: shuttles an admin cancelled for the chosen date */
+.shuttle-card-cancelled {
+  background: #F8FAFC;
+}
+
+.shuttle-card-cancelled .shuttle-dep-time {
+  color: var(--apple-text-muted);
+  text-decoration: line-through;
+}
+
+.shuttle-cancelled-badge {
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--redbus-light);
+  color: var(--redbus-dark);
+}
+
+.shuttle-cancelled-reason {
+  font-size: 0.74rem;
+  color: var(--apple-text-secondary);
+  max-width: 220px;
+  text-align: right;
+}
+
+.shuttle-card-cancelled .select-shuttle-btn:disabled {
+  background: #E2E8F0;
+  color: var(--apple-text-secondary);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.booking-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  color: var(--redbus-dark);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.booking-error svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
 .admin-load-label {
   display: flex;
   justify-content: space-between;

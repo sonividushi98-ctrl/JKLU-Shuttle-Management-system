@@ -109,8 +109,11 @@ exports.getSlotLoad = async (req, res) => {
       .map(slot => {
         const id = String(slot._id);
         const bookedSeats = booked[id] || 0;
+        const cancellation = (slot.cancelledDates || []).find(c => c.date === date);
         return {
           ...slotSummary(slot),
+          cancelled: Boolean(cancellation),
+          cancelReason: cancellation ? cancellation.reason : null,
           bookedSeats,
           seatsLeft: Math.max(slot.totalSeats - bookedSeats, 0),
           cancelledByAdmin: cancelledByAdmin[id] || 0,
@@ -225,14 +228,20 @@ exports.cancelSlot = async (req, res) => {
     }
 
     let cancelledCount = 0;
+    const cancellation = { date, reason, cancelledAt: new Date() };
 
     if (isDbConnected()) {
+      // Remember the cancellation on the slot (replacing an earlier one for the same date)
+      await Slot.updateOne({ _id: slotId }, { $pull: { cancelledDates: { date } } });
+      await Slot.updateOne({ _id: slotId }, { $push: { cancelledDates: cancellation } });
+
       const result = await Booking.updateMany(
         { slot: slotId, date, status: 'Confirmed' },
         { $set: { status: 'Cancelled', cancelReason: reason } }
       );
       cancelledCount = result.modifiedCount;
     } else {
+      slot.cancelledDates = (slot.cancelledDates || []).filter(c => c.date !== date).concat(cancellation);
       memoryStore.bookings.forEach(b => {
         if (slotIdOf(b) === slotId && b.date === date && b.status === 'Confirmed') {
           b.status = 'Cancelled';
@@ -244,8 +253,8 @@ exports.cancelSlot = async (req, res) => {
 
     return res.json({
       message: cancelledCount > 0
-        ? `Shuttle cancelled. ${cancelledCount} booking(s) marked as Cancelled.`
-        : 'Shuttle cancelled. There were no confirmed bookings for this date.',
+        ? `Shuttle cancelled for ${date}. ${cancelledCount} booking(s) marked as Cancelled.`
+        : `Shuttle cancelled for ${date}. There were no confirmed bookings to cancel.`,
       slotId,
       date,
       reason,

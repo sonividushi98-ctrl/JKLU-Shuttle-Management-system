@@ -154,6 +154,8 @@ const readDismissed = () => {
 };
 const isAdminCancelled = (trip) => trip.status === 'Cancelled' && Boolean(trip.cancelReason);
 const byIdOf = (trips) => new Map(trips.map((t) => [String(t._id), t]));
+// The admin cancellation for a shuttle on a date (YYYY-MM-DD), or undefined
+const slotCancellation = (slot, date) => (slot?.cancelledDates || []).find((c) => c.date === date);
 
 // Official JKLU 3 Shuttle Stops
 const JKLU_STOPS = [
@@ -403,6 +405,7 @@ const App = () => {
   // Server connection status
   const [isServerOnline, setIsServerOnline] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [bookingError, setBookingError] = useState('');
 
   // ==========================================
   // ADMIN ROLE & ADMIN CANCELLATIONS
@@ -510,9 +513,11 @@ const App = () => {
     }
   }, []);
 
+  // Load shuttles on start and again whenever the Book tab is opened,
+  // so admin changes (extra shuttles, cancellations) show up
   useEffect(() => {
-    fetchSlots();
-  }, [fetchSlots]);
+    if (currentTab === 'book') fetchSlots();
+  }, [currentTab, fetchSlots]);
 
   // Fetch booked seats when a slot or date changes
   const fetchBookedSeats = useCallback(async (slotId, date) => {
@@ -538,6 +543,8 @@ const App = () => {
 
   // Handle slot selection
   const handleSelectSlot = (slot) => {
+    if (slotCancellation(slot, selectedDate)) return;
+    setBookingError('');
     setSelectedSlot(slot);
     setSelectedSeat(null);
     fetchBookedSeats(slot._id, selectedDate);
@@ -555,6 +562,7 @@ const App = () => {
   // Seat click handler
   const handleSeatClick = (seatNum) => {
     if (bookedSeats.includes(seatNum)) return;
+    setBookingError('');
     setSelectedSeat(seatNum === selectedSeat ? null : seatNum);
   };
 
@@ -592,8 +600,18 @@ const App = () => {
       setTrackingBus(selectedSlot.busNumber || 'RJ 14 PA 2024');
       setTrackingTrip(newBooking);
       setStep(4);
-    } catch {
-      // Standalone fallback
+      window.scrollTo({ top: 100, behavior: 'smooth' });
+    } catch (err) {
+      if (err.response) {
+        // The server refused the booking (seat already taken, shuttle cancelled, ...):
+        // show its message and refresh what changed instead of issuing a pass
+        setBookingError(err.response.data?.message || 'This booking could not be completed. Please try again.');
+        setSelectedSeat(null);
+        fetchBookedSeats(selectedSlot._id, selectedDate);
+        fetchSlots();
+        return;
+      }
+      // Server unreachable: standalone fallback
       const localBooking = {
         _id: 'jklu-pass-' + Date.now(),
         ...bookingPayload,
@@ -608,9 +626,9 @@ const App = () => {
       setTrackingBus(selectedSlot.busNumber || 'RJ 14 PA 2024');
       setTrackingTrip(localBooking);
       setStep(4);
+      window.scrollTo({ top: 100, behavior: 'smooth' });
     } finally {
       setIsSubmitting(false);
-      window.scrollTo({ top: 100, behavior: 'smooth' });
     }
   };
 
@@ -1118,8 +1136,9 @@ const App = () => {
                 <div className="shuttles-grid">
                   {filteredSlots.map(slot => {
                     const availableCount = slot.totalSeats - 6;
+                    const cancellation = slotCancellation(slot, selectedDate);
                     return (
-                      <div key={slot._id} className="shuttle-card">
+                      <div key={slot._id} className={`shuttle-card ${cancellation ? 'shuttle-card-cancelled' : ''}`}>
                         <div className="shuttle-time-col">
                           <div className="shuttle-dep-time">{slot.time}</div>
                           <span className="shuttle-period-pill">{slot.period}</span>
@@ -1150,20 +1169,30 @@ const App = () => {
                           </div>
                         </div>
 
-                        <div className="shuttle-action-col">
-                          <div className="seats-counter-badge available">
-                            <span>●</span>
-                            <span>{availableCount} Seats Available</span>
+                        {cancellation ? (
+                          <div className="shuttle-action-col">
+                            <div className="shuttle-cancelled-badge">Cancelled for this date</div>
+                            <div className="shuttle-cancelled-reason">{cancellation.reason}</div>
+                            <button className="select-shuttle-btn" disabled aria-disabled="true">
+                              <span>Not available</span>
+                            </button>
                           </div>
+                        ) : (
+                          <div className="shuttle-action-col">
+                            <div className="seats-counter-badge available">
+                              <span>●</span>
+                              <span>{availableCount} Seats Available</span>
+                            </div>
 
-                          <button
-                            className="select-shuttle-btn"
-                            onClick={() => handleSelectSlot(slot)}
-                          >
-                            <span>Select Seats</span>
-                            <ChevronRight size={16} />
-                          </button>
-                        </div>
+                            <button
+                              className="select-shuttle-btn"
+                              onClick={() => handleSelectSlot(slot)}
+                            >
+                              <span>Select Seats</span>
+                              <ChevronRight size={16} />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -1438,6 +1467,13 @@ const App = () => {
                         />
                       </div>
                     </div>
+
+                    {bookingError && (
+                      <div className="booking-error" role="alert">
+                        <AlertTriangle size={16} />
+                        <span>{bookingError}</span>
+                      </div>
+                    )}
 
                     <button
                       className="confirm-booking-btn"

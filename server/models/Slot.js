@@ -22,7 +22,17 @@ const slotSchema = new mongoose.Schema({
       'mansarovar metro station': 35
     }
   },
-  days: { type: [String], default: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] }
+  days: { type: [String], default: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] },
+  // Dates an admin cancelled this shuttle on; no bookings are accepted for these dates
+  cancelledDates: {
+    type: [{
+      _id: false,
+      date: { type: String, required: true }, // 'YYYY-MM-DD'
+      reason: { type: String, required: true },
+      cancelledAt: { type: Date, default: Date.now }
+    }],
+    default: []
+  }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Slot', slotSchema);
