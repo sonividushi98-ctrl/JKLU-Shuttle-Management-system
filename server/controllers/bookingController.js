@@ -164,6 +164,10 @@ let memoryBookings = [
 
 const isDbConnected = () => mongoose.connection.readyState === 1;
 
+// Shared in-memory stores, used by the admin controller's offline fallback.
+// These are the same array objects the routes above read and write.
+exports.memoryStore = { slots: DEFAULT_SLOTS, bookings: memoryBookings };
+
 exports.getStops = (req, res) => {
   res.json({
     origin: 'JKLU Campus (Near Saraswati Statue / Gate 1)',

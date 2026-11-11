@@ -57,7 +57,7 @@ router.post('/signup', async (req, res) => {
       });
 
       const expiresIn = rememberMe ? '30d' : '24h';
-      const token = jwt.sign({ id: user._id, email: user.email }, JWT_SECRET, { expiresIn });
+      const token = jwt.sign({ id: user._id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn });
 
       return res.status(201).json({
         message: 'Account created successfully!',
@@ -92,7 +92,7 @@ router.post('/signup', async (req, res) => {
     memoryUsers.push(newMemUser);
 
     const expiresIn = rememberMe ? '30d' : '24h';
-    const token = jwt.sign({ id: newMemUser.id, email: newMemUser.email }, JWT_SECRET, { expiresIn });
+    const token = jwt.sign({ id: newMemUser.id, email: newMemUser.email, role: newMemUser.role }, JWT_SECRET, { expiresIn });
 
     return res.status(201).json({
       message: 'Account created successfully!',
@@ -142,7 +142,7 @@ router.post('/login', async (req, res) => {
       }
 
       const expiresIn = rememberMe ? '30d' : '24h';
-      const token = jwt.sign({ id: user._id, email: user.email }, JWT_SECRET, { expiresIn });
+      const token = jwt.sign({ id: user._id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn });
 
       return res.json({
         message: 'Login successful!',
@@ -170,7 +170,7 @@ router.post('/login', async (req, res) => {
     }
 
     const expiresIn = rememberMe ? '30d' : '24h';
-    const token = jwt.sign({ id: memUser.id, email: memUser.email }, JWT_SECRET, { expiresIn });
+    const token = jwt.sign({ id: memUser.id, email: memUser.email, role: memUser.role }, JWT_SECRET, { expiresIn });
 
     return res.json({
       message: 'Login successful!',

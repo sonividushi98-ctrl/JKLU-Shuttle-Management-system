@@ -25,9 +25,14 @@ import {
   Key,
   LogIn,
   LogOut,
-  ShieldCheck
+  ShieldCheck,
+  LayoutDashboard,
+  AlertTriangle
 } from 'lucide-react';
+import AdminDashboard from './AdminDashboard';
+import { getStoredToken, clearStoredAuth } from './api/session';
 import './App.css';
+import './Admin.css';
 
 const API_BASE = 'http://localhost:5000/api/bookings';
 const AUTH_API = 'http://localhost:5000/api/auth';
@@ -142,15 +147,13 @@ const TRANSPORT_CONTACT = { name: 'Mr. Mukesh', phone: '+91 9782008380' };
 // They never belonged to a registered account, so they are not accepted.
 const FAKE_TOKENS = ['mock-token-remember', 'demo-token-remember-30d'];
 
-const getStoredToken = () =>
-  localStorage.getItem('jklu_auth_token') || sessionStorage.getItem('jklu_auth_token');
-
-const clearStoredAuth = () => {
-  ['jklu_auth_user', 'jklu_auth_token'].forEach((key) => {
-    localStorage.removeItem(key);
-    sessionStorage.removeItem(key);
-  });
+// Admin-cancelled bookings the student has already dismissed from the banner (this browser only)
+const DISMISSED_KEY = 'jklu_dismissed_cancellations';
+const readDismissed = () => {
+  try { return JSON.parse(localStorage.getItem(DISMISSED_KEY)) || []; } catch { return []; }
 };
+const isAdminCancelled = (trip) => trip.status === 'Cancelled' && Boolean(trip.cancelReason);
+const byIdOf = (trips) => new Map(trips.map((t) => [String(t._id), t]));
 
 // Official JKLU 3 Shuttle Stops
 const JKLU_STOPS = [
@@ -400,6 +403,60 @@ const App = () => {
   // Server connection status
   const [isServerOnline, setIsServerOnline] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // ==========================================
+  // ADMIN ROLE & ADMIN CANCELLATIONS
+  // ==========================================
+  const isAdmin = currentUser?.role === 'Admin';
+
+  // The Admin tab only exists for Admins; anyone else is sent back to booking
+  useEffect(() => {
+    if (currentTab === 'admin' && !isAdmin) setCurrentTab('book');
+  }, [currentTab, isAdmin]);
+
+  // Pull this student's bookings from the server so status changes made by an admin
+  // (status Cancelled + cancelReason) show up. Local-only trips are kept as they are.
+  const currentUserId = currentUser?.id;
+  const currentUserEmail = (currentUser?.email || '').toLowerCase();
+  const refreshMyTrips = useCallback(async () => {
+    if (!currentUserId) return;
+    try {
+      const res = await axios.get(`${API_BASE}/my-trips/${currentUserId}`, { timeout: 4000 });
+      const serverTrips = (Array.isArray(res.data) ? res.data : []).filter(
+        (t) => t.slot && (String(t.user) === String(currentUserId) || (t.passengerEmail || '').toLowerCase() === currentUserEmail)
+      );
+      if (serverTrips.length === 0) return;
+      const byId = byIdOf(serverTrips);
+      setMyTrips((prev) => {
+        const known = new Set(prev.map((t) => String(t._id)));
+        const updated = prev.map((t) => (byId.has(String(t._id)) ? { ...t, ...byId.get(String(t._id)) } : t));
+        return [...serverTrips.filter((t) => !known.has(String(t._id))), ...updated];
+      });
+      // Keep an open boarding pass in step with the server too
+      const syncOpenPass = (pass) =>
+        pass && byId.has(String(pass._id)) ? { ...pass, ...byId.get(String(pass._id)) } : pass;
+      setConfirmedPass(syncOpenPass);
+      setModalTrip(syncOpenPass);
+    } catch {
+      // Server unreachable: keep showing the trips saved on this device
+    }
+  }, [currentUserId, currentUserEmail]);
+
+  // Re-check on sign-in and whenever the student switches tabs
+  useEffect(() => {
+    refreshMyTrips();
+  }, [refreshMyTrips, currentTab]);
+
+  const [dismissedCancellations, setDismissedCancellations] = useState(readDismissed);
+  const bannerCancellations = currentUser
+    ? myTrips.filter((t) => isAdminCancelled(t) && !dismissedCancellations.includes(String(t._id)))
+    : [];
+
+  const dismissCancellations = (ids) => {
+    const next = Array.from(new Set([...dismissedCancellations, ...ids.map(String)]));
+    setDismissedCancellations(next);
+    try { localStorage.setItem(DISMISSED_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+  };
 
   // ==========================================
   // LIVE BUS TRACKING STATE
@@ -664,6 +721,16 @@ const App = () => {
     setCurrentUser(null);
   };
 
+  // An admin request came back 401: the session is no longer valid
+  const handleAdminSessionExpired = useCallback(() => {
+    clearStoredAuth();
+    setCurrentUser(null);
+    setAuthMode('login');
+    setAuthSuccess('');
+    setAuthError('Your session has expired. Please sign in again.');
+    setShowAuthModal(true);
+  }, []);
+
   // Date shortcuts
   const dateOptions = useMemo(() => {
     const today = new Date();
@@ -829,6 +896,15 @@ const App = () => {
               <Clock size={15} />
               Timetable
             </button>
+            {isAdmin && (
+              <button
+                className={`segmented-nav-btn ${currentTab === 'admin' ? 'active' : ''}`}
+                onClick={() => setCurrentTab('admin')}
+              >
+                <LayoutDashboard size={15} />
+                Admin
+              </button>
+            )}
           </nav>
 
           {/* User Account / Remember Me Badge & Operations Status */}
@@ -840,7 +916,7 @@ const App = () => {
                 </div>
                 <div>
                   <div className="user-name-label">{currentUser.name}</div>
-                  <div className="user-roll-tag">{currentUser.rollNumber || 'STUDENT'}</div>
+                  <div className="user-roll-tag">{isAdmin ? 'ADMIN' : currentUser.rollNumber || 'STUDENT'}</div>
                 </div>
                 <button
                   onClick={(e) => { e.stopPropagation(); handleSignOut(); }}
@@ -868,6 +944,42 @@ const App = () => {
 
       {/* Main Container */}
       <main className="main-wrapper">
+        {/* Student notice: bookings cancelled by the transport office */}
+        {bannerCancellations.length > 0 && currentTab !== 'admin' && (
+          <div className="cancel-banner no-print" role="alert">
+            <AlertTriangle size={20} className="cancel-banner-icon" />
+            <div className="cancel-banner-body">
+              <strong>
+                {bannerCancellations.length === 1
+                  ? 'Your shuttle booking was cancelled by the transport office'
+                  : `${bannerCancellations.length} of your shuttle bookings were cancelled by the transport office`}
+              </strong>
+              <ul>
+                {bannerCancellations.map((t) => (
+                  <li key={t._id}>
+                    {t.date} · {t.slot?.time} · Seat #{t.seatNumber} — <em>{t.cancelReason}</em>
+                  </li>
+                ))}
+              </ul>
+              <div className="cancel-banner-actions">
+                {currentTab !== 'passes' && (
+                  <button type="button" onClick={() => setCurrentTab('passes')}>View my passes</button>
+                )}
+                <button type="button" onClick={() => dismissCancellations(bannerCancellations.map((t) => t._id))}>
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* ADMIN DASHBOARD (Admins only) */}
+        {/* ========================================================================= */}
+        {currentTab === 'admin' && isAdmin && (
+          <AdminDashboard onUnauthorized={handleAdminSessionExpired} />
+        )}
+
         {/* ========================================================================= */}
         {/* TAB 1: BOOKING WORKFLOW */}
         {/* ========================================================================= */}
@@ -1354,13 +1466,23 @@ const App = () => {
             {/* STEP 4: APPLE WALLET / REDBUS DIGITAL BOARDING PASS WITH IMMEDIATE LIVE TRACKING */}
             {step === 4 && confirmedPass && (
               <div className="ticket-wrapper">
-                <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-                  <div style={{ width: '48px', height: '48px', background: '#ECFDF5', borderRadius: '50%', color: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px' }}>
-                    <CheckCircle size={28} />
+                {isAdminCancelled(confirmedPass) ? (
+                  <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                    <div style={{ width: '48px', height: '48px', background: '#FEE2E2', borderRadius: '50%', color: '#D82C36', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px' }}>
+                      <AlertTriangle size={26} />
+                    </div>
+                    <h3 style={{ fontSize: '1.4rem', fontWeight: 800 }}>Shuttle Cancelled</h3>
+                    <p style={{ fontSize: '0.85rem', color: '#64748B' }}>The transport office cancelled this shuttle. Please book another one.</p>
                   </div>
-                  <h3 style={{ fontSize: '1.4rem', fontWeight: 800 }}>Booking Confirmed!</h3>
-                  <p style={{ fontSize: '0.85rem', color: '#64748B' }}>Your digital campus shuttle pass is ready</p>
-                </div>
+                ) : (
+                  <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                    <div style={{ width: '48px', height: '48px', background: '#ECFDF5', borderRadius: '50%', color: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px' }}>
+                      <CheckCircle size={28} />
+                    </div>
+                    <h3 style={{ fontSize: '1.4rem', fontWeight: 800 }}>Booking Confirmed!</h3>
+                    <p style={{ fontSize: '0.85rem', color: '#64748B' }}>Your digital campus shuttle pass is ready</p>
+                  </div>
+                )}
 
                 {/* Primary High-Priority CTA: Track Live Shuttle Immediately */}
                 <div style={{ marginBottom: '18px' }}>
@@ -1401,6 +1523,10 @@ const App = () => {
                       ● {confirmedPass.status || 'CONFIRMED'}
                     </div>
                   </div>
+
+                  {isAdminCancelled(confirmedPass) && (
+                    <div className="admin-cancel-tag admin-cancel-tag-pass">Cancelled by admin: {confirmedPass.cancelReason}</div>
+                  )}
 
                   <div className="pass-body">
                     <div className="pass-route-visual">
@@ -1850,6 +1976,10 @@ const App = () => {
                         <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '2px' }}>
                           Seat #{trip.seatNumber} • {trip.passengerName} ({trip.passengerRoll}) • Bus: {trip.slot?.busNumber || 'RJ 14 PA 2024'}
                         </div>
+
+                        {isAdminCancelled(trip) && (
+                          <div className="admin-cancel-tag">Cancelled by admin: {trip.cancelReason}</div>
+                        )}
                       </div>
                     </div>
 
@@ -2266,6 +2396,10 @@ const App = () => {
                   ● {modalTrip.status}
                 </div>
               </div>
+
+              {isAdminCancelled(modalTrip) && (
+                <div className="admin-cancel-tag admin-cancel-tag-pass">Cancelled by admin: {modalTrip.cancelReason}</div>
+              )}
 
               <div className="pass-body">
                 <div className="pass-route-visual">

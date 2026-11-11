@@ -1,0 +1,604 @@
+/* ==========================================================================
+   ADMIN DASHBOARD
+   ========================================================================== */
+
+/* The extra Admin tab makes the navbar wider; tighten it on mid-size screens */
+@media (min-width: 769px) and (max-width: 1200px) {
+  .header-container {
+    gap: 10px;
+  }
+  .segmented-nav-btn {
+    padding: 8px 10px;
+  }
+}
+.admin-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.admin-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.admin-title {
+  font-size: 1.4rem;
+  font-weight: 800;
+}
+
+.admin-sub,
+.admin-stats {
+  font-size: 0.82rem;
+  color: var(--apple-text-secondary);
+}
+
+.admin-stats strong {
+  color: var(--apple-text-primary);
+}
+
+.admin-head-actions {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-date-field,
+.admin-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--apple-text-secondary);
+}
+
+.admin-date-field input,
+.admin-field input,
+.admin-field select,
+.admin-field textarea {
+  font-family: inherit;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--apple-text-primary);
+  padding: 9px 12px;
+  border: 1px solid var(--apple-border-strong);
+  border-radius: 10px;
+  background: var(--apple-card);
+  min-height: 40px;
+}
+
+.admin-field textarea {
+  resize: vertical;
+}
+
+.admin-field small {
+  font-weight: 500;
+  color: var(--apple-text-muted);
+  text-align: right;
+}
+
+.admin-date-field input:focus-visible,
+.admin-field input:focus-visible,
+.admin-field select:focus-visible,
+.admin-field textarea:focus-visible,
+.admin-btn:focus-visible,
+.admin-icon-btn:focus-visible,
+.admin-day-chip input:focus-visible + span,
+.cancel-banner-actions button:focus-visible {
+  outline: 2px solid var(--redbus-primary);
+  outline-offset: 2px;
+}
+
+.admin-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.admin-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.admin-btn-primary {
+  background: var(--redbus-primary);
+  color: #fff;
+}
+
+.admin-btn-primary:hover:not(:disabled) {
+  background: var(--redbus-hover);
+}
+
+.admin-btn-ghost {
+  background: var(--apple-card);
+  color: var(--apple-text-primary);
+  border-color: var(--apple-border-strong);
+}
+
+.admin-btn-ghost:hover:not(:disabled) {
+  background: #F8FAFC;
+}
+
+.admin-btn-danger {
+  background: #FFF1F2;
+  color: var(--redbus-dark);
+  border-color: #FECACA;
+}
+
+.admin-btn-danger:hover:not(:disabled) {
+  background: #FEE2E2;
+}
+
+.admin-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: #F1F5F9;
+  color: var(--apple-text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.admin-spin {
+  animation: admin-spin 1s linear infinite;
+}
+
+@keyframes admin-spin {
+  to { transform: rotate(360deg); }
+}
+
+.admin-panel {
+  background: var(--apple-card);
+  border: 1px solid var(--apple-border);
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: var(--apple-shadow-sm);
+}
+
+.admin-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.admin-panel-title {
+  font-size: 1.02rem;
+  font-weight: 800;
+}
+
+.admin-alert {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.admin-alert > span {
+  flex: 1;
+}
+
+.admin-alert-success {
+  background: var(--color-success-bg);
+  color: #065F46;
+  border: 1px solid #A7F3D0;
+}
+
+.admin-alert-error {
+  background: #FEF2F2;
+  color: var(--redbus-dark);
+  border: 1px solid #FECACA;
+}
+
+.admin-empty {
+  padding: 28px 12px;
+  text-align: center;
+  color: var(--apple-text-secondary);
+  font-size: 0.88rem;
+}
+
+/* Add shuttle form */
+.admin-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.admin-days {
+  border: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0;
+  margin: 0 0 4px;
+}
+
+.admin-days legend {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--apple-text-secondary);
+  margin-bottom: 6px;
+}
+
+.admin-day-chip {
+  position: relative;
+  cursor: pointer;
+}
+
+.admin-day-chip input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.admin-day-chip span {
+  display: inline-block;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--apple-border-strong);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--apple-text-secondary);
+}
+
+.admin-day-chip input:checked + span {
+  background: var(--redbus-light);
+  border-color: #FCA5A5;
+  color: var(--redbus-dark);
+}
+
+.admin-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+/* Load view */
+.admin-slot-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-slot {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--apple-border);
+  border-radius: 14px;
+}
+
+.admin-slot-off {
+  background: #F8FAFC;
+}
+
+.admin-slot-time {
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.admin-slot-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.76rem;
+  color: var(--apple-text-secondary);
+  margin-top: 2px;
+}
+
+.admin-slot-bus {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--apple-text-primary);
+  background: #F1F5F9;
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+
+.admin-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.admin-badge {
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.admin-badge-warn {
+  background: #FEF3C7;
+  color: #92400E;
+}
+
+.admin-badge-full {
+  background: var(--redbus-primary);
+  color: #fff;
+}
+
+.admin-badge-muted {
+  background: #F1F5F9;
+  color: var(--apple-text-secondary);
+}
+
+.admin-badge-cancel {
+  background: #FEE2E2;
+  color: var(--redbus-dark);
+}
+
+.admin-load-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  color: var(--apple-text-secondary);
+  margin-bottom: 6px;
+}
+
+.admin-load-label strong {
+  color: var(--apple-text-primary);
+}
+
+.admin-load-bar {
+  height: 8px;
+  background: #F1F5F9;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.admin-load-fill {
+  height: 100%;
+  background: var(--color-success);
+  border-radius: 999px;
+}
+
+.admin-load-fill.is-warn {
+  background: #F59E0B;
+}
+
+.admin-load-fill.is-full {
+  background: var(--redbus-primary);
+}
+
+.admin-slot-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* Passenger list */
+.admin-table-wrap {
+  overflow-x: auto;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+  text-align: left;
+}
+
+.admin-table th {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--apple-text-muted);
+  padding: 8px 10px;
+  border-bottom: 1px solid #E2E8F0;
+  white-space: nowrap;
+}
+
+.admin-table td {
+  padding: 10px;
+  border-bottom: 1px solid #F1F5F9;
+}
+
+.admin-seat-cell {
+  font-weight: 800;
+}
+
+.admin-stop-cell {
+  text-transform: capitalize;
+}
+
+/* Cancel dialog */
+.admin-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 1000;
+}
+
+.admin-modal {
+  background: var(--apple-card);
+  border-radius: 20px;
+  padding: 20px;
+  width: 100%;
+  max-width: 460px;
+  box-shadow: var(--apple-shadow-xl);
+}
+
+.admin-modal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.admin-modal-head h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.admin-confirm-box {
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #FFFBEB;
+  border: 1px solid #FDE68A;
+  color: #78350F;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.admin-confirm-box svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.admin-confirm-reason {
+  margin-top: 6px;
+  font-weight: 700;
+}
+
+@media (max-width: 840px) {
+  .admin-slot {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .admin-slot-actions .admin-btn {
+    flex: 1;
+  }
+  .admin-head-actions {
+    width: 100%;
+  }
+  .admin-date-field {
+    flex: 1;
+  }
+}
+
+/* ==========================================================================
+   STUDENT: ADMIN CANCELLATION BANNER & TAG
+   ========================================================================== */
+.cancel-banner {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  border-radius: 16px;
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  color: var(--redbus-dark);
+}
+
+.cancel-banner-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.cancel-banner-body {
+  flex: 1;
+  font-size: 0.86rem;
+}
+
+.cancel-banner-body ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.cancel-banner-body li {
+  margin-top: 2px;
+}
+
+.cancel-banner-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.cancel-banner-actions button {
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1px solid #FCA5A5;
+  background: #fff;
+  color: var(--redbus-dark);
+  cursor: pointer;
+}
+
+.admin-cancel-tag {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 3px 10px;
+  border-radius: 8px;
+  background: #FEE2E2;
+  color: var(--redbus-dark);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.admin-cancel-tag-pass {
+  display: block;
+  margin: 12px 16px 0;
+  text-align: center;
+}
+
+/* Printing: only the passenger list, without the navbar or admin controls */
+@media print {
+  .no-print,
+  .app-header {
+    display: none !important;
+  }
+  .admin-print-area {
+    border: none;
+    box-shadow: none;
+    padding: 0;
+  }
+  .admin-table {
+    font-size: 11pt;
+  }
+  .admin-table th,
+  .admin-table td {
+    border-bottom: 1px solid #999;
+    color: #000;
+  }
+}
