@@ -2056,3 +2056,166 @@ body {
     gap: 16px;
   }
 }
+
+/* ==========================================================================
+   OFFICIAL TIMETABLE (Academic Year 2026-27)
+   ========================================================================== */
+.tt-card {
+  background: var(--apple-card);
+  border-radius: 24px;
+  border: 1px solid var(--apple-border);
+  padding: 28px;
+  box-shadow: var(--apple-shadow-sm);
+}
+
+.tt-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.tt-toggle {
+  display: inline-flex;
+  background: #F1F5F9;
+  border-radius: 999px;
+  padding: 4px;
+}
+
+.tt-toggle-btn {
+  border: none;
+  background: transparent;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--apple-text-secondary);
+  cursor: pointer;
+}
+
+.tt-toggle-btn.active {
+  background: var(--apple-card);
+  color: var(--redbus-primary);
+  box-shadow: var(--apple-shadow-md);
+}
+
+.tt-toggle-btn:focus-visible {
+  outline: 2px solid var(--redbus-primary);
+  outline-offset: 2px;
+}
+
+.tt-day-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--apple-text-primary);
+  background: #F8FAFC;
+  border: 1px solid var(--apple-border);
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-bottom: 18px;
+  text-align: center;
+}
+
+.tt-routes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  align-items: start;
+}
+
+.tt-route {
+  border: 1px solid var(--apple-border);
+  border-radius: 18px;
+  padding: 18px;
+}
+
+.tt-route-name {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--redbus-primary);
+  margin-bottom: 10px;
+}
+
+.tt-leg + .tt-leg {
+  margin-top: 16px;
+}
+
+.tt-leg-title {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--apple-text-muted);
+  margin-bottom: 6px;
+}
+
+.tt-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  text-align: left;
+}
+
+.tt-table th {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--apple-text-muted);
+  padding: 6px 8px;
+  border-bottom: 1px solid #E2E8F0;
+}
+
+.tt-table td {
+  padding: 9px 8px;
+  border-bottom: 1px solid #F1F5F9;
+  vertical-align: top;
+}
+
+.tt-label {
+  width: 30%;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--apple-text-secondary);
+}
+
+.tt-place {
+  font-weight: 600;
+  color: var(--apple-text-primary);
+}
+
+.tt-time {
+  text-align: right;
+  font-weight: 800;
+  white-space: nowrap;
+  color: var(--apple-text-primary);
+}
+
+.tt-contact {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 20px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--redbus-light);
+  color: var(--redbus-dark);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.tt-contact a {
+  color: inherit;
+  font-weight: 800;
+}
+
+@media (max-width: 840px) {
+  .tt-card { padding: 18px; }
+  .tt-routes { grid-template-columns: 1fr; }
+  .tt-header { align-items: flex-start; }
+  .tt-toggle { width: 100%; }
+  .tt-toggle-btn { flex: 1; padding: 8px 10px; }
+}

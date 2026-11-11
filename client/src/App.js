@@ -32,6 +32,126 @@ import './App.css';
 const API_BASE = 'http://localhost:5000/api/bookings';
 const AUTH_API = 'http://localhost:5000/api/auth';
 
+// Official JKLU Shuttle Service timetable, Academic Year 2026-27.
+// Each route is split into legs; each stop row is [label, place, time].
+const OFFICIAL_TIMETABLE = {
+  weekday: {
+    title: 'Monday to Friday (Working Days)',
+    routes: [
+      {
+        name: 'Route 1',
+        legs: [
+          {
+            title: 'Campus → City',
+            stops: [
+              ['Departure From', 'JKLU Campus Main Gate', '1:30 PM'],
+              ['Arrival at', 'Elements Mall, Ajmer Road', '1:50 PM'],
+              ['Arrival at', 'Mansarovar Metro Station', '2:00 PM']
+            ]
+          },
+          {
+            title: 'City → Campus',
+            stops: [
+              ['Departure From', 'Mansarovar Metro Station', '3:45 PM'],
+              ['Departure From', 'Elements Mall, Ajmer Road', '3:55 PM'],
+              ['Arrival at', 'JKLU Campus', '4:15 PM']
+            ]
+          }
+        ]
+      },
+      {
+        name: 'Route 2',
+        legs: [
+          {
+            title: 'City → Campus',
+            stops: [
+              ['Departure From', 'Mansarovar Metro Station', '7:30 PM'],
+              ['Arrival at', 'JKLU Campus Main Gate', '8:00 PM']
+            ]
+          },
+          {
+            title: 'Campus → City',
+            stops: [
+              ['Departure From', 'JKLU Campus Main Gate', '8:15 PM'],
+              ['Drop point', 'Elements Mall, Ajmer Road', '8:40 PM'],
+              ['Drop point', 'Mansarovar Metro Station', '8:50 PM']
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  weekend: {
+    title: 'All Saturdays, Sundays & Holidays',
+    routes: [
+      {
+        name: 'Route 1',
+        legs: [
+          {
+            title: 'Campus → City',
+            stops: [
+              ['Departure From', 'JKLU Campus Main Gate', '11:30 AM'],
+              ['Arrival at', 'Elements Mall, Ajmer Road', '11:50 AM'],
+              ['Arrival at', 'Mansarovar Metro Station', '12:00 Noon']
+            ]
+          },
+          {
+            title: 'City → Campus',
+            stops: [
+              ['Departure From', 'Mansarovar Metro Station', '3:00 PM'],
+              ['Departure From', 'Elements Mall, Ajmer Road', '3:10 PM'],
+              ['Arrival at', 'JKLU Campus Main Gate', '3:30 PM']
+            ]
+          }
+        ]
+      },
+      {
+        name: 'Route 2',
+        legs: [
+          {
+            title: 'Campus → City',
+            stops: [
+              ['Departure From', 'JKLU Campus Main Gate', '3:50 PM'],
+              ['Drop point', 'Elements Mall', '4:10 PM'],
+              ['Drop point', 'Mansarovar Metro Station', '4:15 PM'],
+              ['Drop point', 'Ganga Jamuna Petrol Pump', '4:20 PM'],
+              ['Drop point', 'Gujar ki Thadi', '4:25 PM'],
+              ['Drop point', 'Ridhi Sidhi Churaha', '4:30 PM'],
+              ['Drop point', 'Triveni Nagar Churaha', '4:35 PM'],
+              ['Arrival at', 'Gopalpura Mode', '4:45 PM'],
+              ['Arrival at', 'GT Mall, WTP', '5:00 PM']
+            ]
+          },
+          {
+            title: 'City → Campus',
+            stops: [
+              ['Departure From', 'GT Mall, WTP', '8:00 PM'],
+              ['Arrival at', 'Mansarovar Metro Station', '8:40 PM'],
+              ['Arrival at', 'JKLU Campus Main Gate', '9:00 PM']
+            ]
+          }
+        ]
+      }
+    ]
+  }
+};
+
+const TRANSPORT_CONTACT = { name: 'Mr. Mukesh', phone: '+91 9782008380' };
+
+// Tokens written by older versions of this app without asking the server.
+// They never belonged to a registered account, so they are not accepted.
+const FAKE_TOKENS = ['mock-token-remember', 'demo-token-remember-30d'];
+
+const getStoredToken = () =>
+  localStorage.getItem('jklu_auth_token') || sessionStorage.getItem('jklu_auth_token');
+
+const clearStoredAuth = () => {
+  ['jklu_auth_user', 'jklu_auth_token'].forEach((key) => {
+    localStorage.removeItem(key);
+    sessionStorage.removeItem(key);
+  });
+};
+
 // Official JKLU 3 Shuttle Stops
 const JKLU_STOPS = [
   {
@@ -191,26 +311,17 @@ const App = () => {
   // AUTHENTICATION & REMEMBER ME STATE
   // ==========================================
   const [currentUser, setCurrentUser] = useState(() => {
-    // 1. Check localStorage first (Remember Me enabled)
-    const localUser = localStorage.getItem('jklu_auth_user');
-    if (localUser) {
-      try { return JSON.parse(localUser); } catch { /* ignore */ }
+    // Only restore a user that was signed in through the server (has a real JWT).
+    // localStorage = Remember Me enabled; sessionStorage = this browser session only.
+    for (const store of [localStorage, sessionStorage]) {
+      const token = store.getItem('jklu_auth_token');
+      const savedUser = store.getItem('jklu_auth_user');
+      if (token && savedUser && !FAKE_TOKENS.includes(token)) {
+        try { return JSON.parse(savedUser); } catch { /* ignore */ }
+      }
     }
-    // 2. Check sessionStorage
-    const sessionUser = sessionStorage.getItem('jklu_auth_user');
-    if (sessionUser) {
-      try { return JSON.parse(sessionUser); } catch { /* ignore */ }
-    }
-    // 3. Default pre-authenticated student for seamless initial experience
-    const defaultUser = {
-      id: 'user-jklu-default',
-      name: 'Aarav Sharma',
-      email: 'student@jklu.edu.in',
-      rollNumber: '2023BTECH042',
-      role: 'Student'
-    };
-    localStorage.setItem('jklu_auth_user', JSON.stringify(defaultUser));
-    return defaultUser;
+    clearStoredAuth();
+    return null;
   });
 
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -226,7 +337,12 @@ const App = () => {
 
   // Navigation tabs: 'book' | 'passes' | 'tracking' | 'route' | 'timetable'
   const [currentTab, setCurrentTab] = useState('book');
-  
+
+  // Timetable view: open on today's schedule (weekend on Saturday/Sunday)
+  const [timetableDay, setTimetableDay] = useState(() =>
+    [0, 6].includes(new Date().getDay()) ? 'weekend' : 'weekday'
+  );
+
   // Booking steps: 1: Select Shuttle, 2: Select Stop, 3: Select Seat & Passenger, 4: Boarding Pass
   const [step, setStep] = useState(1);
 
@@ -243,9 +359,26 @@ const App = () => {
   const [bookedSeats, setBookedSeats] = useState([3, 7, 12, 18, 22]);
   
   // Passenger Info (syncs automatically with currentUser)
-  const [passengerName, setPassengerName] = useState(currentUser?.name || 'Aarav Sharma');
-  const [passengerRoll, setPassengerRoll] = useState(currentUser?.rollNumber || '2023BTECH042');
-  const [passengerEmail, setPassengerEmail] = useState(currentUser?.email || 'student@jklu.edu.in');
+  const [passengerName, setPassengerName] = useState(currentUser?.name || '');
+  const [passengerRoll, setPassengerRoll] = useState(currentUser?.rollNumber || '');
+  const [passengerEmail, setPassengerEmail] = useState(currentUser?.email || '');
+
+  // On load, confirm the saved session still belongs to a registered account.
+  // If the server rejects the token (expired, or the account no longer exists), sign out.
+  useEffect(() => {
+    const token = getStoredToken();
+    if (!token) return;
+    axios
+      .get(`${AUTH_API}/me`, { headers: { Authorization: `Bearer ${token}` }, timeout: 3000 })
+      .then((res) => setCurrentUser(res.data))
+      .catch((err) => {
+        if (err.response) {
+          clearStoredAuth();
+          setCurrentUser(null);
+        }
+        // No response means the server is unreachable; keep the session until it can be checked.
+      });
+  }, []);
 
   // Keep passenger info synced whenever currentUser updates
   useEffect(() => {
@@ -372,9 +505,18 @@ const App = () => {
   const handleConfirmBooking = async () => {
     if (!selectedSlot || !selectedStop || !selectedSeat) return;
 
+    // Booking needs a registered, signed-in account
+    if (!currentUser) {
+      setAuthMode('login');
+      setAuthError('Please sign in with your registered JKLU account to confirm this booking.');
+      setAuthSuccess('');
+      setShowAuthModal(true);
+      return;
+    }
+
     setIsSubmitting(true);
     const bookingPayload = {
-      userId: currentUser?.id || '654321098765432109876543',
+      userId: currentUser.id,
       slotId: selectedSlot._id,
       stop: selectedStop,
       seatNumber: selectedSeat,
@@ -505,52 +647,20 @@ const App = () => {
         setAuthLoading(false);
       }, 500);
     } catch (err) {
-      // In offline / standalone mode fallback
-      const fallbackUser = {
-        id: 'user-' + Date.now(),
-        name: authName.trim() || cleanEmail.split('@')[0],
-        email: cleanEmail,
-        rollNumber: authRoll.trim().toUpperCase() || '2023BTECH001',
-        role: 'Student'
-      };
-
-      if (authRememberMe) {
-        localStorage.setItem('jklu_auth_user', JSON.stringify(fallbackUser));
-        localStorage.setItem('jklu_auth_token', 'mock-token-remember');
+      // Never sign anyone in without the server's approval.
+      // Show the server's own message (e.g. "No account found with this JKLU email. Please Sign Up.").
+      if (err.response?.data?.message) {
+        setAuthError(err.response.data.message);
       } else {
-        sessionStorage.setItem('jklu_auth_user', JSON.stringify(fallbackUser));
+        setAuthError('Cannot reach the shuttle server. Make sure the backend is running, then try again.');
       }
-
-      setCurrentUser(fallbackUser);
-      setAuthSuccess(`Welcome, ${fallbackUser.name}!`);
-      setTimeout(() => {
-        setShowAuthModal(false);
-        setAuthLoading(false);
-      }, 500);
+      setAuthLoading(false);
     }
-  };
-
-  // Quick 1-Tap Student Demo Login
-  const handleQuickDemoLogin = () => {
-    const demoUser = {
-      id: 'user-jklu-default',
-      name: 'Aarav Sharma',
-      email: 'student@jklu.edu.in',
-      rollNumber: '2023BTECH042',
-      role: 'Student'
-    };
-    localStorage.setItem('jklu_auth_user', JSON.stringify(demoUser));
-    localStorage.setItem('jklu_auth_token', 'demo-token-remember-30d');
-    setCurrentUser(demoUser);
-    setShowAuthModal(false);
   };
 
   // Sign out
   const handleSignOut = () => {
-    localStorage.removeItem('jklu_auth_user');
-    localStorage.removeItem('jklu_auth_token');
-    sessionStorage.removeItem('jklu_auth_user');
-    sessionStorage.removeItem('jklu_auth_token');
+    clearStoredAuth();
     setCurrentUser(null);
   };
 
@@ -1859,65 +1969,70 @@ const App = () => {
         {/* TAB 5: COMPLETE SHUTTLE TIMETABLE */}
         {/* ========================================================================= */}
         {currentTab === 'timetable' && (
-          <div style={{ background: '#ffffff', borderRadius: '24px', border: '1px solid var(--apple-border)', padding: '28px', boxShadow: 'var(--apple-shadow-sm)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <div className="tt-card">
+            <div className="tt-header">
               <div>
                 <h3 style={{ fontSize: '1.3rem', fontWeight: 800 }}>Official Shuttle Timetable</h3>
-                <p style={{ fontSize: '0.82rem', color: '#64748B' }}>Daily departures from JKLU Campus Gate 1</p>
+                <p style={{ fontSize: '0.82rem', color: '#64748B' }}>JKLU Shuttle Service · Academic Year 2026-27</p>
               </div>
 
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <span className="stop-tag" style={{ background: '#ECFDF5', color: '#065F46' }}>Monday - Saturday Active</span>
+              <div className="tt-toggle" role="tablist" aria-label="Choose schedule">
+                {[['weekday', 'Mon – Fri'], ['weekend', 'Sat, Sun & Holidays']].map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    role="tab"
+                    aria-selected={timetableDay === key}
+                    className={`tt-toggle-btn ${timetableDay === key ? 'active' : ''}`}
+                    onClick={() => setTimetableDay(key)}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
             </div>
 
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
-                <thead>
-                  <tr style={{ borderBottom: '2px solid #E2E8F0', color: '#64748B', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    <th style={{ padding: '12px 16px' }}>Departure Time</th>
-                    <th style={{ padding: '12px 16px' }}>Shift</th>
-                    <th style={{ padding: '12px 16px' }}>Route & 3 Stops</th>
-                    <th style={{ padding: '12px 16px' }}>Bus Vehicle</th>
-                    <th style={{ padding: '12px 16px' }}>Capacity</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'right' }}>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {slots.map((slot) => (
-                    <tr key={slot._id} style={{ borderBottom: '1px solid #F1F5F9' }}>
-                      <td style={{ padding: '16px', fontWeight: 800, fontSize: '0.95rem' }}>
-                        {slot.time}
-                      </td>
-                      <td style={{ padding: '16px' }}>
-                        <span className="shuttle-period-pill">{slot.period}</span>
-                      </td>
-                      <td style={{ padding: '16px' }}>
-                        <div style={{ fontWeight: 600 }}>JKLU ➔ 200 Ft Bypass ➔ Elements Mall ➔ Metro</div>
-                        <div style={{ fontSize: '0.72rem', color: '#94A3B8' }}>Stops at all 3 designated points</div>
-                      </td>
-                      <td style={{ padding: '16px' }}>
-                        <span className="bus-plate">{slot.busNumber}</span>
-                      </td>
-                      <td style={{ padding: '16px', color: '#64748B' }}>
-                        {slot.totalSeats} AC Seats
-                      </td>
-                      <td style={{ padding: '16px', textAlign: 'right' }}>
-                        <button
-                          className="select-shuttle-btn"
-                          style={{ padding: '6px 14px', fontSize: '0.75rem' }}
-                          onClick={() => {
-                            setCurrentTab('book');
-                            handleSelectSlot(slot);
-                          }}
-                        >
-                          Book Seat
-                        </button>
-                      </td>
-                    </tr>
+            <p className="tt-day-title">Routes for {OFFICIAL_TIMETABLE[timetableDay].title}</p>
+
+            <div className="tt-routes">
+              {OFFICIAL_TIMETABLE[timetableDay].routes.map((route) => (
+                <section key={route.name} className="tt-route">
+                  <h4 className="tt-route-name">{route.name}</h4>
+                  {route.legs.map((leg) => (
+                    <div key={leg.title} className="tt-leg">
+                      <div className="tt-leg-title">{leg.title}</div>
+                      <table className="tt-table">
+                        <thead>
+                          <tr>
+                            <th scope="col">Stop</th>
+                            <th scope="col">Place</th>
+                            <th scope="col" style={{ textAlign: 'right' }}>Time</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {leg.stops.map(([label, place, time], i) => (
+                            <tr key={`${place}-${time}`}>
+                              <td className="tt-label">
+                                {i === 0 || leg.stops[i - 1][0] !== label ? label : ''}
+                              </td>
+                              <td className="tt-place">{place}</td>
+                              <td className="tt-time">{time}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   ))}
-                </tbody>
-              </table>
+                </section>
+              ))}
+            </div>
+
+            <div className="tt-contact">
+              <Phone size={15} />
+              <span>
+                In case of any queries, please contact {TRANSPORT_CONTACT.name}:{' '}
+                <a href={`tel:${TRANSPORT_CONTACT.phone.replace(/\s/g, '')}`}>{TRANSPORT_CONTACT.phone}</a>
+              </span>
             </div>
           </div>
         )}
@@ -2086,20 +2201,16 @@ const App = () => {
                 </button>
               </form>
 
-              {/* 1-Tap Quick Demo Login for instant testing */}
-              <div className="quick-demo-login-box">
-                <p style={{ fontSize: '0.72rem', color: '#64748B', marginBottom: '8px' }}>
-                  Testing or evaluating the app?
-                </p>
+              <p style={{ fontSize: '0.75rem', color: '#64748B', textAlign: 'center', marginTop: '14px' }}>
+                {authMode === 'login' ? 'New here? ' : 'Already registered? '}
                 <button
                   type="button"
-                  className="quick-demo-btn"
-                  onClick={handleQuickDemoLogin}
+                  onClick={() => { setAuthMode(authMode === 'login' ? 'signup' : 'login'); setAuthError(''); setAuthSuccess(''); }}
+                  style={{ background: 'none', border: 'none', color: '#D82C36', fontWeight: 700, cursor: 'pointer', padding: 0, fontSize: 'inherit' }}
                 >
-                  <Sparkles size={14} color="#D82C36" />
-                  <span>1-Tap Demo Student Login (Aarav Sharma)</span>
+                  {authMode === 'login' ? 'Register your JKLU account' : 'Sign in'}
                 </button>
-              </div>
+              </p>
             </div>
           </div>
         </div>
