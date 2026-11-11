@@ -10,6 +10,7 @@ const bookingSchema = new mongoose.Schema({
   seatNumber: { type: Number, required: true },
   date: { type: String, required: true }, // 'YYYY-MM-DD'
   status: { type: String, enum: ['Confirmed', 'Cancelled'], default: 'Confirmed' },
+  cancelReason: { type: String, required: false }, // set when an admin cancels the whole shuttle
   bookingCode: { type: String, default: () => 'JKLU-' + Math.floor(100000 + Math.random() * 900000) }
 }, { timestamps: true });
 

@@ -164,6 +164,14 @@ let memoryBookings = [
 
 const isDbConnected = () => mongoose.connection.readyState === 1;
 
+// The admin cancellation recorded for a slot on a date, or undefined
+const cancellationFor = (slot, date) =>
+  slot && Array.isArray(slot.cancelledDates) ? slot.cancelledDates.find(c => c.date === date) : undefined;
+
+// Shared in-memory stores, used by the admin controller's offline fallback.
+// These are the same array objects the routes above read and write.
+exports.memoryStore = { slots: DEFAULT_SLOTS, bookings: memoryBookings };
+
 exports.getStops = (req, res) => {
   res.json({
     origin: 'JKLU Campus (Near Saraswati Statue / Gate 1)',
@@ -231,6 +239,17 @@ exports.createBooking = async (req, res) => {
 
     const bookingDate = date || new Date().toISOString().split('T')[0];
     const parsedSeat = parseInt(seatNumber, 10);
+
+    // Refuse bookings on a date the admin cancelled this shuttle
+    const slotForCheck = isDbConnected()
+      ? (mongoose.isValidObjectId(slotId) ? await Slot.findById(slotId).select('cancelledDates') : null)
+      : DEFAULT_SLOTS.find(s => s._id === slotId);
+    const cancellation = cancellationFor(slotForCheck, bookingDate);
+    if (cancellation) {
+      return res.status(400).json({
+        message: `This shuttle has been cancelled for ${bookingDate}: ${cancellation.reason}`
+      });
+    }
 
     if (isDbConnected()) {
       // Check existing booking
