@@ -31,8 +31,21 @@ import {
 } from 'lucide-react';
 import AdminDashboard from './AdminDashboard';
 import { getStoredToken, clearStoredAuth } from './api/session';
+import {
+  OFFICIAL_TRIPS,
+  CAMPUS,
+  isInbound,
+  stopsOf,
+  stopTime,
+  arrivalTime,
+  tripEnds,
+  runsOn,
+  minutesOf,
+  weekdayOf
+} from './data/trips';
 import './App.css';
 import './Admin.css';
+import './Trips.css';
 
 const API_BASE = 'http://localhost:5000/api/bookings';
 const AUTH_API = 'http://localhost:5000/api/auth';
@@ -191,100 +204,8 @@ const JKLU_STOPS = [
   }
 ];
 
-// Default JKLU Shuttle Schedules
-const INITIAL_SLOTS = [
-  {
-    _id: 'slot-1',
-    time: '07:45 AM',
-    period: 'Morning',
-    origin: 'JKLU Campus (Main Gate)',
-    destination: 'Mansarovar Metro Station',
-    direction: 'Campus ➔ Metro & Stops',
-    busNumber: 'RJ 14 PA 2024',
-    busType: 'JKLU AC Electric Shuttle',
-    totalSeats: 32,
-    availableStops: ['200 feet bypass', 'Elements Mall', 'mansarovar metro station'],
-    days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-  },
-  {
-    _id: 'slot-2',
-    time: '09:30 AM',
-    period: 'Morning',
-    origin: 'JKLU Campus (Main Gate)',
-    destination: 'Mansarovar Metro Station',
-    direction: 'Campus ➔ Metro & Stops',
-    busNumber: 'RJ 14 PB 1102',
-    busType: 'Tata Starbus AC Executive',
-    totalSeats: 32,
-    availableStops: ['200 feet bypass', 'Elements Mall', 'mansarovar metro station'],
-    days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
-  },
-  {
-    _id: 'slot-3',
-    time: '01:30 PM',
-    period: 'Afternoon',
-    origin: 'JKLU Campus (Main Gate)',
-    destination: 'Mansarovar Metro Station',
-    direction: 'Campus ➔ Metro & Stops',
-    busNumber: 'RJ 14 PA 2024',
-    busType: 'JKLU AC Electric Shuttle',
-    totalSeats: 32,
-    availableStops: ['200 feet bypass', 'Elements Mall', 'mansarovar metro station'],
-    days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-  },
-  {
-    _id: 'slot-4',
-    time: '03:45 PM',
-    period: 'Afternoon',
-    origin: 'JKLU Campus (Main Gate)',
-    destination: 'Mansarovar Metro Station',
-    direction: 'Campus ➔ Metro & Stops',
-    busNumber: 'RJ 14 PC 4410',
-    busType: 'Eicher Skyline Pro AC',
-    totalSeats: 32,
-    availableStops: ['200 feet bypass', 'Elements Mall', 'mansarovar metro station'],
-    days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
-  },
-  {
-    _id: 'slot-5',
-    time: '05:15 PM',
-    period: 'Evening',
-    origin: 'JKLU Campus (Main Gate)',
-    destination: 'Mansarovar Metro Station',
-    direction: 'Campus ➔ Metro & Stops (Prime Shift)',
-    busNumber: 'RJ 14 PA 2024',
-    busType: 'JKLU AC Electric Shuttle',
-    totalSeats: 32,
-    availableStops: ['200 feet bypass', 'Elements Mall', 'mansarovar metro station'],
-    days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-  },
-  {
-    _id: 'slot-6',
-    time: '06:45 PM',
-    period: 'Evening',
-    origin: 'JKLU Campus (Main Gate)',
-    destination: 'Mansarovar Metro Station',
-    direction: 'Campus ➔ Metro & Stops',
-    busNumber: 'RJ 14 PB 1102',
-    busType: 'Tata Starbus AC Executive',
-    totalSeats: 32,
-    availableStops: ['200 feet bypass', 'Elements Mall', 'mansarovar metro station'],
-    days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
-  },
-  {
-    _id: 'slot-7',
-    time: '08:30 PM',
-    period: 'Night',
-    origin: 'JKLU Campus (Main Gate)',
-    destination: 'Mansarovar Metro Station',
-    direction: 'Campus ➔ Metro & Stops (Night Service)',
-    busNumber: 'RJ 14 PC 4410',
-    busType: 'Eicher Skyline Pro AC',
-    totalSeats: 32,
-    availableStops: ['200 feet bypass', 'Elements Mall', 'mansarovar metro station'],
-    days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-  }
-];
+// Offline fallback: the official timetable trips
+const INITIAL_SLOTS = OFFICIAL_TRIPS;
 
 // Initial mock trips
 const INITIAL_MY_TRIPS = [
@@ -294,8 +215,8 @@ const INITIAL_MY_TRIPS = [
     passengerName: 'Aarav Sharma',
     passengerRoll: '2023BTECH042',
     passengerEmail: 'aarav.sharma@jklu.edu.in',
-    slot: INITIAL_SLOTS[4], // 5:15 PM
-    stop: 'mansarovar metro station',
+    slot: INITIAL_SLOTS[0], // 1:30 PM, Route 1
+    stop: 'Mansarovar Metro Station',
     seatNumber: 14,
     date: new Date().toISOString().split('T')[0],
     status: 'Confirmed',
@@ -359,7 +280,8 @@ const App = () => {
   // Booking selections
   const [slots, setSlots] = useState(INITIAL_SLOTS);
   const [selectedSlot, setSelectedSlot] = useState(null);
-  const [selectedStop, setSelectedStop] = useState(JKLU_STOPS[2].name); // default: Mansarovar Metro
+  // Campus to City: the drop stop. City to Campus: the boarding stop.
+  const [selectedStop, setSelectedStop] = useState('');
   const [selectedSeat, setSelectedSeat] = useState(null);
   const [bookedSeats, setBookedSeats] = useState([3, 7, 12, 18, 22]);
   
@@ -547,6 +469,9 @@ const App = () => {
     setBookingError('');
     setSelectedSlot(slot);
     setSelectedSeat(null);
+    // Preselect the usual stop: the first pickup coming in, the final stop going out
+    const stops = stopsOf(slot);
+    setSelectedStop((isInbound(slot) ? stops[0] : stops[stops.length - 1]) || '');
     fetchBookedSeats(slot._id, selectedDate);
     setStep(2);
     window.scrollTo({ top: 120, behavior: 'smooth' });
@@ -767,16 +692,19 @@ const App = () => {
 
   // Filter slots
   const filteredSlots = useMemo(() => {
-    return slots.filter(slot => {
-      if (selectedPeriod !== 'All' && slot.period !== selectedPeriod) return false;
-      return true;
-    });
-  }, [slots, selectedPeriod]);
+    // Only trips that run on the chosen day, in the chosen direction, in departure order
+    return slots
+      .filter(slot => {
+        if (!runsOn(slot, selectedDate)) return false;
+        if ((directionFilter === 'inbound') !== isInbound(slot)) return false;
+        if (selectedPeriod !== 'All' && slot.period !== selectedPeriod) return false;
+        return true;
+      })
+      .sort((a, b) => minutesOf(a.time) - minutesOf(b.time));
+  }, [slots, selectedPeriod, selectedDate, directionFilter]);
 
-  // Selected stop object
-  const currentStopMeta = useMemo(() => {
-    return JKLU_STOPS.find(s => s.name === selectedStop) || JKLU_STOPS[2];
-  }, [selectedStop]);
+  // Where the selected booking starts and ends
+  const selectedTripEnds = selectedSlot ? tripEnds(selectedSlot, selectedStop) : { from: '', to: '' };
 
   // Active driver for live tracking
   const currentDriver = BUS_DRIVERS[trackingBus] || BUS_DRIVERS['RJ 14 PA 2024'];
@@ -1051,8 +979,8 @@ const App = () => {
               >
                 <div className="step-bubble">2</div>
                 <div className="step-meta">
-                  <h4>Choose Drop Stop</h4>
-                  <p>3 Official Stops</p>
+                  <h4>Choose Stop</h4>
+                  <p>{directionFilter === 'inbound' ? 'Where you board' : 'Where you get off'}</p>
                 </div>
               </div>
 
@@ -1133,39 +1061,63 @@ const App = () => {
                 </div>
 
                 {/* Shuttles List */}
+                {filteredSlots.length === 0 && (
+                  <div className="no-trips-box">
+                    <Bus size={32} color="#94A3B8" />
+                    <h4>
+                      No {directionFilter === 'inbound' ? 'City ➔ JKLU Campus' : 'JKLU ➔ City'} shuttles
+                      {selectedPeriod !== 'All' ? ` in the ${selectedPeriod.toLowerCase()}` : ''} on {weekdayOf(selectedDate)}
+                    </h4>
+                    <p>Try the other direction{selectedPeriod !== 'All' ? ', another shift' : ''} or another day, or check the Timetable tab.</p>
+                  </div>
+                )}
                 <div className="shuttles-grid">
                   {filteredSlots.map(slot => {
                     const availableCount = slot.totalSeats - 6;
                     const cancellation = slotCancellation(slot, selectedDate);
+                    const inbound = isInbound(slot);
+                    const routeStops = inbound
+                      ? [...stopsOf(slot), 'JKLU Campus']
+                      : ['JKLU Campus', ...stopsOf(slot)];
+                    const arrives = arrivalTime(slot);
                     return (
                       <div key={slot._id} className={`shuttle-card ${cancellation ? 'shuttle-card-cancelled' : ''}`}>
                         <div className="shuttle-time-col">
                           <div className="shuttle-dep-time">{slot.time}</div>
                           <span className="shuttle-period-pill">{slot.period}</span>
+                          {slot.routeName && <span className="shuttle-route-pill">{slot.routeName}</span>}
                         </div>
 
                         <div className="shuttle-route-col">
                           <div className="route-direction-badge">
                             <MapPin size={15} color="#D82C36" />
-                            <span>JKLU Campus ➔ Mansarovar Metro</span>
+                            <span>{routeStops[0]} ➔ {routeStops[routeStops.length - 1]}</span>
                           </div>
 
                           <div className="route-stops-line">
-                            <span className="stop-tag">Gate 1</span>
-                            <ArrowRight size={12} color="#94A3B8" />
-                            <span className="stop-tag">200 Ft Bypass</span>
-                            <ArrowRight size={12} color="#94A3B8" />
-                            <span className="stop-tag">Elements Mall</span>
-                            <ArrowRight size={12} color="#94A3B8" />
-                            <span className="stop-tag" style={{ background: '#FEE2E2', color: '#991B1B' }}>Metro Stn</span>
+                            {routeStops.map((stop, i) => (
+                              <React.Fragment key={stop}>
+                                {i > 0 && <ArrowRight size={12} color="#94A3B8" />}
+                                <span
+                                  className="stop-tag"
+                                  style={i === routeStops.length - 1 ? { background: '#FEE2E2', color: '#991B1B' } : undefined}
+                                >
+                                  {stop}
+                                </span>
+                              </React.Fragment>
+                            ))}
                           </div>
 
                           <div className="bus-meta-tags">
                             <span className="bus-plate">{slot.busNumber}</span>
                             <span>•</span>
                             <span>{slot.busType || 'AC Shuttle'}</span>
-                            <span>•</span>
-                            <span>ETA 35 min total</span>
+                            {arrives && (
+                              <>
+                                <span>•</span>
+                                <span>Reaches {routeStops[routeStops.length - 1]} at {arrives}</span>
+                              </>
+                            )}
                           </div>
                         </div>
 
@@ -1205,9 +1157,15 @@ const App = () => {
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
                   <div>
-                    <h3 style={{ fontSize: '1.25rem', fontWeight: 800 }}>Select Your Destination Stop</h3>
+                    <h3 style={{ fontSize: '1.25rem', fontWeight: 800 }}>
+                      {isInbound(selectedSlot) ? 'Select Your Boarding Stop' : 'Select Your Drop Stop'}
+                    </h3>
                     <p style={{ fontSize: '0.82rem', color: '#64748B' }}>
-                      Shuttle departs at <strong>{selectedSlot.time}</strong> from JKLU Main Campus Gate 1.
+                      {selectedSlot.routeName ? `${selectedSlot.routeName}: ` : ''}
+                      leaves <strong>{selectedSlot.origin || CAMPUS}</strong> at <strong>{selectedSlot.time}</strong>
+                      {arrivalTime(selectedSlot) && (
+                        <> and reaches <strong>{selectedSlot.destination}</strong> at <strong>{arrivalTime(selectedSlot)}</strong></>
+                      )}.
                     </p>
                   </div>
                   <button
@@ -1218,36 +1176,42 @@ const App = () => {
                   </button>
                 </div>
 
-                {/* 3 Stops Grid */}
+                {/* This trip's stops, in route order */}
                 <div className="stops-selection-grid">
-                  {JKLU_STOPS.map((stop, idx) => {
-                    const isSelected = selectedStop === stop.name;
+                  {stopsOf(selectedSlot).map((stopName, idx) => {
+                    const isSelected = selectedStop === stopName;
+                    const info = JKLU_STOPS.find(s => s.name.toLowerCase() === stopName.toLowerCase());
+                    const at = stopTime(selectedSlot, stopName);
                     return (
                       <div
-                        key={stop.id}
+                        key={stopName}
                         className={`stop-card ${isSelected ? 'selected' : ''}`}
-                        onClick={() => setSelectedStop(stop.name)}
+                        onClick={() => setSelectedStop(stopName)}
                       >
                         <div className="stop-card-info">
                           <div className="stop-card-num">{idx + 1}</div>
                           <div>
-                            <div className="stop-name-title">{stop.displayName}</div>
-                            <div className="stop-landmark-text">
-                              <MapPin size={14} color="#D82C36" />
-                              <span>{stop.landmark}</span>
-                            </div>
-                            <div className="stop-desc-text">{stop.description}</div>
+                            <div className="stop-name-title">{stopName}</div>
+                            {info && (
+                              <div className="stop-landmark-text">
+                                <MapPin size={14} color="#D82C36" />
+                                <span>{info.landmark}</span>
+                              </div>
+                            )}
+                            {info && <div className="stop-desc-text">{info.description}</div>}
                           </div>
                         </div>
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                          <div className="stop-eta-badge">
-                            <div className="stop-eta-time">~{stop.etaMinutes} min</div>
-                            <div className="stop-eta-label">{stop.distanceKm} km from JKLU</div>
-                          </div>
+                          {at && (
+                            <div className="stop-eta-badge">
+                              <div className="stop-eta-time">{at}</div>
+                              <div className="stop-eta-label">{isInbound(selectedSlot) ? 'Pick-up time' : 'Drop time'}</div>
+                            </div>
+                          )}
                           <button
                             className="select-shuttle-btn"
-                            onClick={(e) => { e.stopPropagation(); handleSelectStop(stop.name); }}
+                            onClick={(e) => { e.stopPropagation(); handleSelectStop(stopName); }}
                             style={{ padding: '8px 16px', fontSize: '0.8rem' }}
                           >
                             <span>Choose Stop</span>
@@ -1279,7 +1243,7 @@ const App = () => {
                   <div>
                     <h3 style={{ fontSize: '1.25rem', fontWeight: 800 }}>Choose Your Seat</h3>
                     <p style={{ fontSize: '0.82rem', color: '#64748B' }}>
-                      {selectedSlot.time} Departure • Stop: <strong>{currentStopMeta.displayName}</strong> • Bus: <strong>{selectedSlot.busNumber}</strong>
+                      {selectedSlot.time} Departure • <strong>{selectedTripEnds.from}</strong> ➔ <strong>{selectedTripEnds.to}</strong> • Bus: <strong>{selectedSlot.busNumber}</strong>
                     </p>
                   </div>
                   <button
@@ -1393,13 +1357,17 @@ const App = () => {
 
                     <div className="summary-detail-row">
                       <span className="summary-label">Boarding Point</span>
-                      <span className="summary-value">JKLU Gate 1</span>
+                      <span className="summary-value">
+                        {selectedTripEnds.from}
+                        {isInbound(selectedSlot) && stopTime(selectedSlot, selectedStop) ? ` (${stopTime(selectedSlot, selectedStop)})` : ''}
+                      </span>
                     </div>
 
                     <div className="summary-detail-row">
                       <span className="summary-label">Drop-off Stop</span>
                       <span className="summary-value" style={{ color: '#D82C36' }}>
-                        {currentStopMeta.displayName}
+                        {selectedTripEnds.to}
+                        {!isInbound(selectedSlot) && stopTime(selectedSlot, selectedStop) ? ` (${stopTime(selectedSlot, selectedStop)})` : ''}
                       </span>
                     </div>
 
@@ -1568,8 +1536,10 @@ const App = () => {
                     <div className="pass-route-visual">
                       <div className="pass-stop-node">
                         <div className="pass-node-label">ORIGIN</div>
-                        <div className="pass-node-title">JKLU Campus</div>
-                        <div style={{ fontSize: '0.72rem', color: '#64748B' }}>Main Gate (Saraswati Statue)</div>
+                        <div className="pass-node-title">{tripEnds(confirmedPass.slot, confirmedPass.stop).from}</div>
+                        <div style={{ fontSize: '0.72rem', color: '#64748B' }}>
+                          {isInbound(confirmedPass.slot) ? 'Pick-up stop' : 'Main Gate (Saraswati Statue)'}
+                        </div>
                       </div>
 
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -1582,9 +1552,11 @@ const App = () => {
                       <div className="pass-stop-node right">
                         <div className="pass-node-label">DESTINATION</div>
                         <div className="pass-node-title" style={{ color: '#D82C36' }}>
-                          {confirmedPass.stop}
+                          {tripEnds(confirmedPass.slot, confirmedPass.stop).to}
                         </div>
-                        <div style={{ fontSize: '0.72rem', color: '#64748B' }}>Jaipur City Stop</div>
+                        <div style={{ fontSize: '0.72rem', color: '#64748B' }}>
+                          {isInbound(confirmedPass.slot) ? 'Main Gate' : 'Jaipur City Stop'}
+                        </div>
                       </div>
                     </div>
 
@@ -2006,7 +1978,8 @@ const App = () => {
                         </div>
 
                         <div style={{ fontSize: '0.85rem', color: '#0F172A', marginTop: '4px', fontWeight: 600 }}>
-                          JKLU Campus ➔ <span style={{ color: '#D82C36' }}>{trip.stop}</span>
+                          {tripEnds(trip.slot, trip.stop).from} ➔{' '}
+                          <span style={{ color: '#D82C36' }}>{tripEnds(trip.slot, trip.stop).to}</span>
                         </div>
 
                         <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '2px' }}>
@@ -2441,8 +2414,10 @@ const App = () => {
                 <div className="pass-route-visual">
                   <div className="pass-stop-node">
                     <div className="pass-node-label">ORIGIN</div>
-                    <div className="pass-node-title">JKLU Campus</div>
-                    <div style={{ fontSize: '0.72rem', color: '#64748B' }}>Main Gate 1</div>
+                    <div className="pass-node-title">{tripEnds(modalTrip.slot, modalTrip.stop).from}</div>
+                    <div style={{ fontSize: '0.72rem', color: '#64748B' }}>
+                      {isInbound(modalTrip.slot) ? 'Pick-up stop' : 'Main Gate 1'}
+                    </div>
                   </div>
 
                   <Bus size={18} color="#D82C36" />
@@ -2450,7 +2425,7 @@ const App = () => {
                   <div className="pass-stop-node right">
                     <div className="pass-node-label">DESTINATION</div>
                     <div className="pass-node-title" style={{ color: '#D82C36' }}>
-                      {modalTrip.stop}
+                      {tripEnds(modalTrip.slot, modalTrip.stop).to}
                     </div>
                   </div>
                 </div>

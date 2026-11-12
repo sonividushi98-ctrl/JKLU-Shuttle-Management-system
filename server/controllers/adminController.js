@@ -7,6 +7,26 @@ const { memoryStore } = require('./bookingController');
 const isDbConnected = () => mongoose.connection.readyState === 1;
 
 const PERIODS = ['Morning', 'Afternoon', 'Evening', 'Night'];
+const DIRECTIONS = ['Campus to City', 'City to Campus'];
+const CAMPUS = 'JKLU Campus Main Gate';
+
+// Stops for an extra shuttle, matching Route 1 on the official timetable
+const CAMPUS_TO_CITY_DEFAULTS = {
+  direction: 'Campus to City',
+  origin: CAMPUS,
+  destination: 'Mansarovar Metro Station',
+  availableStops: ['Elements Mall', 'Mansarovar Metro Station'],
+  etaMinutes: { 'Elements Mall': 20, 'Mansarovar Metro Station': 30 },
+  durationMinutes: 30
+};
+const CITY_TO_CAMPUS_DEFAULTS = {
+  direction: 'City to Campus',
+  origin: 'Mansarovar Metro Station',
+  destination: CAMPUS,
+  availableStops: ['Mansarovar Metro Station', 'Elements Mall'],
+  etaMinutes: { 'Mansarovar Metro Station': 0, 'Elements Mall': 10 },
+  durationMinutes: 30
+};
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^(0?[1-9]|1[0-2]):([0-5]\d)\s*(AM|PM)$/i;
@@ -46,7 +66,10 @@ const slotSummary = (slot) => ({
   _id: slot._id,
   time: slot.time,
   period: slot.period,
+  routeName: slot.routeName,
   direction: slot.direction,
+  origin: slot.origin,
+  destination: slot.destination,
   busNumber: slot.busNumber,
   busType: slot.busType,
   totalSeats: slot.totalSeats,
@@ -174,8 +197,13 @@ exports.createSlot = async (req, res) => {
       busNumber: cleanBus,
       totalSeats: seats
     };
+    if (direction !== undefined && direction !== '' && !DIRECTIONS.includes(direction)) {
+      return res.status(400).json({ message: `direction must be one of: ${DIRECTIONS.join(', ')}` });
+    }
+
+    // Start from the standard Route 1 stops for the chosen direction; any fields sent override them
+    Object.assign(slotData, direction === 'City to Campus' ? CITY_TO_CAMPUS_DEFAULTS : CAMPUS_TO_CITY_DEFAULTS);
     if (busType) slotData.busType = String(busType).trim();
-    if (direction) slotData.direction = String(direction).trim();
     if (origin) slotData.origin = String(origin).trim();
     if (destination) slotData.destination = String(destination).trim();
     if (Array.isArray(availableStops) && availableStops.length > 0) slotData.availableStops = availableStops;
@@ -189,10 +217,6 @@ exports.createSlot = async (req, res) => {
     // In-memory fallback: same defaults as the Slot model
     const memSlot = {
       _id: crypto.randomBytes(12).toString('hex'),
-      direction: 'JKLU Campus to Mansarovar Metro',
-      origin: 'JKLU Campus (Main Gate)',
-      destination: 'Mansarovar Metro Station',
-      availableStops: ['200 feet bypass', 'Elements Mall', 'mansarovar metro station'],
       busType: 'AC Executive Shuttle',
       days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
       ...slotData
