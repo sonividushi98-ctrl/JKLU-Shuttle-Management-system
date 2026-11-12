@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const Slot = require('../models/Slot');
 const Booking = require('../models/Booking');
+const { OFFICIAL_TRIPS } = require('../data/officialTrips');
 
 // Official JKLU 3 Shuttle Stops
 const JKLU_STOPS = [
@@ -33,100 +34,14 @@ const JKLU_STOPS = [
   }
 ];
 
-// Initial seeded slots
-const DEFAULT_SLOTS = [
-  {
-    _id: '672000000000000000000001',
-    time: '07:45 AM',
-    period: 'Morning',
-    origin: 'JKLU Campus (Main Gate)',
-    destination: 'Mansarovar Metro Station',
-    direction: 'Campus ➔ Metro & Stops',
-    busNumber: 'RJ 14 PA 2024',
-    busType: 'JKLU AC Electric Shuttle',
-    totalSeats: 32,
-    availableStops: ['200 feet bypass', 'Elements Mall', 'mansarovar metro station'],
-    days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-  },
-  {
-    _id: '672000000000000000000002',
-    time: '09:30 AM',
-    period: 'Morning',
-    origin: 'JKLU Campus (Main Gate)',
-    destination: 'Mansarovar Metro Station',
-    direction: 'Campus ➔ Metro & Stops',
-    busNumber: 'RJ 14 PB 1102',
-    busType: 'Tata Starbus AC',
-    totalSeats: 32,
-    availableStops: ['200 feet bypass', 'Elements Mall', 'mansarovar metro station'],
-    days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
-  },
-  {
-    _id: '672000000000000000000003',
-    time: '01:30 PM',
-    period: 'Afternoon',
-    origin: 'JKLU Campus (Main Gate)',
-    destination: 'Mansarovar Metro Station',
-    direction: 'Campus ➔ Metro & Stops',
-    busNumber: 'RJ 14 PA 2024',
-    busType: 'JKLU AC Electric Shuttle',
-    totalSeats: 32,
-    availableStops: ['200 feet bypass', 'Elements Mall', 'mansarovar metro station'],
-    days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-  },
-  {
-    _id: '672000000000000000000004',
-    time: '03:45 PM',
-    period: 'Afternoon',
-    origin: 'JKLU Campus (Main Gate)',
-    destination: 'Mansarovar Metro Station',
-    direction: 'Campus ➔ Metro & Stops',
-    busNumber: 'RJ 14 PC 4410',
-    busType: 'Eicher Skyline Pro AC',
-    totalSeats: 32,
-    availableStops: ['200 feet bypass', 'Elements Mall', 'mansarovar metro station'],
-    days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
-  },
-  {
-    _id: '672000000000000000000005',
-    time: '05:15 PM',
-    period: 'Evening',
-    origin: 'JKLU Campus (Main Gate)',
-    destination: 'Mansarovar Metro Station',
-    direction: 'Campus ➔ Metro & Stops (Prime Shift)',
-    busNumber: 'RJ 14 PA 2024',
-    busType: 'JKLU AC Electric Shuttle',
-    totalSeats: 32,
-    availableStops: ['200 feet bypass', 'Elements Mall', 'mansarovar metro station'],
-    days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-  },
-  {
-    _id: '672000000000000000000006',
-    time: '06:45 PM',
-    period: 'Evening',
-    origin: 'JKLU Campus (Main Gate)',
-    destination: 'Mansarovar Metro Station',
-    direction: 'Campus ➔ Metro & Stops',
-    busNumber: 'RJ 14 PB 1102',
-    busType: 'Tata Starbus AC',
-    totalSeats: 32,
-    availableStops: ['200 feet bypass', 'Elements Mall', 'mansarovar metro station'],
-    days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
-  },
-  {
-    _id: '672000000000000000000007',
-    time: '08:30 PM',
-    period: 'Night',
-    origin: 'JKLU Campus (Main Gate)',
-    destination: 'Mansarovar Metro Station',
-    direction: 'Campus ➔ Metro & Stops (Night Service)',
-    busNumber: 'RJ 14 PC 4410',
-    busType: 'Eicher Skyline Pro AC',
-    totalSeats: 32,
-    availableStops: ['200 feet bypass', 'Elements Mall', 'mansarovar metro station'],
-    days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-  }
-];
+// Bookable trips from the official JKLU timetable (see data/officialTrips.js).
+// Seeded into MongoDB when the slots collection is empty, and used directly in memory mode.
+const DEFAULT_SLOTS = OFFICIAL_TRIPS.map(t => ({
+  ...t,
+  days: [...t.days],
+  availableStops: [...t.availableStops],
+  etaMinutes: { ...t.etaMinutes }
+}));
 
 // In-memory fallback stores when MongoDB is offline
 let memoryBookings = [
@@ -138,7 +53,7 @@ let memoryBookings = [
     passengerEmail: 'aarav.sharma@jklu.edu.in',
     slot: DEFAULT_SLOTS[0],
     slotId: DEFAULT_SLOTS[0]._id,
-    stop: 'mansarovar metro station',
+    stop: 'Mansarovar Metro Station',
     seatNumber: 4,
     date: new Date().toISOString().split('T')[0],
     status: 'Confirmed',
@@ -151,8 +66,8 @@ let memoryBookings = [
     passengerName: 'Aarav Sharma',
     passengerRoll: '2023BTECH042',
     passengerEmail: 'aarav.sharma@jklu.edu.in',
-    slot: DEFAULT_SLOTS[4],
-    slotId: DEFAULT_SLOTS[4]._id,
+    slot: DEFAULT_SLOTS[3],
+    slotId: DEFAULT_SLOTS[3]._id,
     stop: 'Elements Mall',
     seatNumber: 12,
     date: new Date().toISOString().split('T')[0],
@@ -179,13 +94,22 @@ exports.getStops = (req, res) => {
   });
 };
 
+// Only one seeding at a time: two requests arriving together on an empty
+// database used to insert the default slots twice.
+let seedingSlots = null;
+
 exports.getSlots = async (req, res) => {
   try {
     if (isDbConnected()) {
       let slots = await Slot.find();
       if (!slots || slots.length === 0) {
         // Seed default slots into DB
-        slots = await Slot.insertMany(DEFAULT_SLOTS.map(({ _id, ...s }) => s));
+        if (!seedingSlots) {
+          seedingSlots = Slot.insertMany(DEFAULT_SLOTS.map(({ _id, ...s }) => s))
+            .finally(() => { seedingSlots = null; });
+        }
+        await seedingSlots;
+        slots = await Slot.find();
       }
       return res.json(slots);
     }

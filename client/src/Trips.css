@@ -1,0 +1,42 @@
+/* Booking list for the official timetable trips */
+
+.route-stops-line {
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+
+.shuttle-route-pill {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--redbus-light);
+  color: var(--redbus-dark);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.no-trips-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 40px 20px;
+  margin-bottom: 16px;
+  text-align: center;
+  background: var(--apple-card);
+  border: 1px dashed var(--apple-border-strong);
+  border-radius: 18px;
+}
+
+.no-trips-box h4 {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--apple-text-primary);
+}
+
+.no-trips-box p {
+  font-size: 0.84rem;
+  color: var(--apple-text-secondary);
+}

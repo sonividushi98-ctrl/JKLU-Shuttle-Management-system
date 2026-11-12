@@ -47,7 +47,8 @@ const EMPTY_FORM = {
   busType: '',
   totalSeats: 32,
   period: '',
-  days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  direction: 'Campus to City',
+  days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
 };
 
 const AdminDashboard = ({ onUnauthorized }) => {
@@ -155,6 +156,7 @@ const AdminDashboard = ({ onUnauthorized }) => {
       };
       if (form.busType.trim()) payload.busType = form.busType.trim();
       if (form.period) payload.period = form.period;
+      payload.direction = form.direction;
 
       const data = await createSlot(payload);
       setNotice(`${data.message} ${data.slot.time} · ${data.slot.busNumber}`);
@@ -274,6 +276,13 @@ const AdminDashboard = ({ onUnauthorized }) => {
               <input type="number" min="4" max="60" step="4" value={form.totalSeats} onChange={(e) => updateForm('totalSeats', e.target.value)} />
             </label>
             <label className="admin-field">
+              <span>Direction</span>
+              <select value={form.direction} onChange={(e) => updateForm('direction', e.target.value)}>
+                <option value="Campus to City">Campus ➔ Elements Mall, Mansarovar Metro</option>
+                <option value="City to Campus">Mansarovar Metro, Elements Mall ➔ Campus</option>
+              </select>
+            </label>
+            <label className="admin-field">
               <span>Shift</span>
               <select value={form.period} onChange={(e) => updateForm('period', e.target.value)}>
                 <option value="">Automatic (from time)</option>
@@ -335,7 +344,10 @@ const AdminDashboard = ({ onUnauthorized }) => {
                     <div className="admin-slot-time">{slot.time}</div>
                     <div className="admin-slot-meta">
                       <span className="admin-slot-bus">{slot.busNumber}</span>
-                      <span>{slot.period} · {slot.busType}</span>
+                      <span>
+                        {slot.routeName ? `${slot.routeName} · ` : ''}
+                        {slot.direction === 'City to Campus' ? 'City ➔ Campus' : 'Campus ➔ City'} · {slot.period}
+                      </span>
                     </div>
                     <div className="admin-badges">
                       {slot.cancelled && <span className="admin-badge admin-badge-full">Cancelled for this date</span>}
