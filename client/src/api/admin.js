@@ -23,6 +23,18 @@ export const getSlotLoad = (date) =>
 export const createSlot = (slot) =>
   adminApi.post('/slots', slot).then((res) => res.data);
 
+export const getRoutes = () =>
+  adminApi.get('/routes').then((res) => res.data);
+
+export const createRoute = (route) =>
+  adminApi.post('/routes', route).then((res) => res.data);
+
+export const updateRoute = (routeId, route) =>
+  adminApi.put(`/routes/${routeId}`, route).then((res) => res.data);
+
+export const deleteRoute = (routeId) =>
+  adminApi.delete(`/routes/${routeId}`).then((res) => res.data);
+
 export const cancelSlot = (slotId, date, reason) =>
   adminApi.post(`/slots/${slotId}/cancel`, { date, reason }).then((res) => res.data);
 

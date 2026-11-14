@@ -5,6 +5,7 @@ jest.mock('./api/admin', () => ({
   adminErrorMessage: jest.fn(() => 'Admin request failed'),
   cancelSlot: jest.fn(),
   createSlot: jest.fn(),
+  getRoutes: jest.fn(() => Promise.resolve([])),
   getPassengers: jest.fn(),
   getSlotLoad: jest.fn(() => Promise.resolve({ slots: [] }))
 }));
@@ -38,4 +39,5 @@ describe('Admin shuttle form', () => {
     fireEvent.change(typeSelect, { target: { value: 'Bus' } });
     expect(seatInput).toHaveValue(24);
   });
+
 });
