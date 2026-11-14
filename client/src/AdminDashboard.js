@@ -3,14 +3,27 @@ import {
   AlertTriangle,
   Bus,
   CheckCircle,
+  Edit3,
+  MapPin,
   Plus,
   Printer,
   RefreshCw,
+  Trash2,
   Users,
   X,
   XCircle
 } from 'lucide-react';
-import { adminErrorMessage, cancelSlot, createSlot, getPassengers, getSlotLoad } from './api/admin';
+import {
+  adminErrorMessage,
+  cancelSlot,
+  createRoute,
+  createSlot,
+  deleteRoute,
+  getPassengers,
+  getRoutes,
+  getSlotLoad,
+  updateRoute
+} from './api/admin';
 
 const NEARLY_FULL = 0.8;
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -52,7 +65,26 @@ const createEmptyForm = () => ({
   totalSeats: 30,
   period: '',
   direction: 'Campus to City',
+  routeId: '',
   days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+});
+
+const createEmptyRouteForm = () => ({
+  name: '',
+  direction: 'Campus to City',
+  origin: 'JKLU Campus Main Gate',
+  destination: '',
+  durationMinutes: 30,
+  stopsText: ''
+});
+
+const routeToForm = (route) => ({
+  name: route.name,
+  direction: route.direction,
+  origin: route.origin,
+  destination: route.destination,
+  durationMinutes: route.durationMinutes,
+  stopsText: (route.availableStops || []).map((stop) => `${stop}${route.etaMinutes?.[stop] !== undefined ? ` | ${route.etaMinutes[stop]}` : ''}`).join('\n')
 });
 
 const AdminDashboard = ({ onUnauthorized }) => {
@@ -67,6 +99,12 @@ const AdminDashboard = ({ onUnauthorized }) => {
   const [seatCapacityEdited, setSeatCapacityEdited] = useState(false);
   const [formError, setFormError] = useState('');
   const [formSaving, setFormSaving] = useState(false);
+  const [routes, setRoutes] = useState([]);
+  const [showRouteForm, setShowRouteForm] = useState(false);
+  const [routeForm, setRouteForm] = useState(createEmptyRouteForm);
+  const [editingRouteId, setEditingRouteId] = useState(null);
+  const [routeError, setRouteError] = useState('');
+  const [routeSaving, setRouteSaving] = useState(false);
 
   const [cancelTarget, setCancelTarget] = useState(null); // slot being cancelled
   const [cancelStep, setCancelStep] = useState('reason'); // 'reason' | 'confirm'
@@ -90,6 +128,18 @@ const AdminDashboard = ({ onUnauthorized }) => {
     }
     setter(adminErrorMessage(err));
   }, [onUnauthorized]);
+
+  const refreshRoutes = useCallback(async () => {
+    try {
+      setRoutes((await getRoutes()) || []);
+    } catch (err) {
+      handleError(err, setRouteError);
+    }
+  }, [handleError]);
+
+  useEffect(() => {
+    refreshRoutes();
+  }, [refreshRoutes]);
 
   const refreshLoad = useCallback(async () => {
     setLoading(true);
@@ -142,8 +192,88 @@ const AdminDashboard = ({ onUnauthorized }) => {
       const type = BUS_TYPES.find((option) => option.value === value);
       next.totalSeats = type ? type.defaultSeats : 30;
     }
+    if (field === 'routeId' && value) {
+      const selectedRoute = routes.find((route) => String(route._id) === value);
+      if (selectedRoute) next.direction = selectedRoute.direction;
+    }
     return next;
   });
+
+  const updateRouteForm = (field, value) => setRouteForm((prev) => ({ ...prev, [field]: value }));
+
+  const routePayload = () => {
+    const stops = routeForm.stopsText
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const [name, eta] = line.split('|').map((part) => part.trim());
+        return { name, eta: Number(eta) };
+      });
+    const availableStops = stops.map((stop) => stop.name);
+    const etaMinutes = {};
+    stops.forEach((stop) => {
+      if (stop.name && Number.isInteger(stop.eta)) etaMinutes[stop.name] = stop.eta;
+    });
+    return {
+      name: routeForm.name.trim(),
+      direction: routeForm.direction,
+      origin: routeForm.origin.trim(),
+      destination: routeForm.destination.trim(),
+      durationMinutes: Number(routeForm.durationMinutes),
+      availableStops,
+      etaMinutes
+    };
+  };
+
+  const openNewRoute = () => {
+    setEditingRouteId(null);
+    setRouteForm(createEmptyRouteForm());
+    setRouteError('');
+    setShowRouteForm(true);
+  };
+
+  const openEditRoute = (route) => {
+    setEditingRouteId(route._id);
+    setRouteForm(routeToForm(route));
+    setRouteError('');
+    setShowRouteForm(true);
+  };
+
+  const handleSaveRoute = async (e) => {
+    e.preventDefault();
+    setRouteError('');
+    if (!routeForm.name.trim() || !routeForm.destination.trim()) return setRouteError('Enter a route name and destination.');
+    if (!routeForm.stopsText.trim()) return setRouteError('Add at least one stop, one per line.');
+    setRouteSaving(true);
+    try {
+      const data = editingRouteId
+        ? await updateRoute(editingRouteId, routePayload())
+        : await createRoute(routePayload());
+      setNotice(data.message);
+      setShowRouteForm(false);
+      setRouteForm(createEmptyRouteForm());
+      setEditingRouteId(null);
+      await refreshRoutes();
+      refreshLoad();
+    } catch (err) {
+      handleError(err, setRouteError);
+    } finally {
+      setRouteSaving(false);
+    }
+  };
+
+  const handleDeleteRoute = async (route) => {
+    if (!window.confirm(`Delete "${route.name}"? Routes assigned to shuttles cannot be deleted.`)) return;
+    setRouteError('');
+    try {
+      const data = await deleteRoute(route._id);
+      setNotice(data.message);
+      await refreshRoutes();
+    } catch (err) {
+      handleError(err, setRouteError);
+    }
+  };
 
   const toggleDay = (day) =>
     setForm((prev) => ({
@@ -166,6 +296,7 @@ const AdminDashboard = ({ onUnauthorized }) => {
         totalSeats: Number(form.totalSeats),
         days: WEEKDAYS.filter((d) => form.days.includes(d))
       };
+      if (form.routeId) payload.routeId = form.routeId;
       if (form.busType.trim()) payload.busType = form.busType.trim();
       if (form.period) payload.period = form.period;
       payload.direction = form.direction;
@@ -314,6 +445,15 @@ const AdminDashboard = ({ onUnauthorized }) => {
               </select>
             </label>
             <label className="admin-field">
+              <span>Route</span>
+              <select value={form.routeId} onChange={(e) => updateForm('routeId', e.target.value)}>
+                <option value="">Standard shuttle route</option>
+                {routes.map((route) => (
+                  <option key={route._id} value={route._id}>{route.name} · {route.destination}</option>
+                ))}
+              </select>
+            </label>
+            <label className="admin-field">
               <span>Seats <small className="admin-field-hint"></small></span>
               <input
                 type="number"
@@ -359,6 +499,91 @@ const AdminDashboard = ({ onUnauthorized }) => {
           </div>
         </form>
       )}
+
+      <section id="admin-routes" className="admin-panel no-print" aria-labelledby="admin-routes-title">
+        <div className="admin-panel-head">
+          <div>
+            <h3 id="admin-routes-title" className="admin-panel-title">Routes</h3>
+            <p className="admin-stats">Design reusable routes, then select them when adding a shuttle.</p>
+          </div>
+          <button type="button" className="admin-btn admin-btn-primary" onClick={openNewRoute}>
+            <Plus size={15} />
+            <span>Add route</span>
+          </button>
+        </div>
+
+        {routeError && <div className="admin-alert admin-alert-error" role="alert">{routeError}</div>}
+
+        {showRouteForm && (
+          <form className="admin-route-form" onSubmit={handleSaveRoute}>
+            <h4 className="admin-panel-title">{editingRouteId ? 'Edit route' : 'Design a new route'}</h4>
+            <div className="admin-form-grid">
+              <label className="admin-field">
+                <span>Route name *</span>
+                <input value={routeForm.name} onChange={(e) => updateRouteForm('name', e.target.value)} placeholder="Route 3" required />
+              </label>
+              <label className="admin-field">
+                <span>Direction *</span>
+                <select value={routeForm.direction} onChange={(e) => updateRouteForm('direction', e.target.value)}>
+                  <option value="Campus to City">Campus → City</option>
+                  <option value="City to Campus">City → Campus</option>
+                </select>
+              </label>
+              <label className="admin-field">
+                <span>Origin *</span>
+                <input value={routeForm.origin} onChange={(e) => updateRouteForm('origin', e.target.value)} required />
+              </label>
+              <label className="admin-field">
+                <span>Destination *</span>
+                <input value={routeForm.destination} onChange={(e) => updateRouteForm('destination', e.target.value)} placeholder="Vaishali Nagar" required />
+              </label>
+              <label className="admin-field">
+                <span>Total duration (minutes) *</span>
+                <input type="number" min="1" max="240" value={routeForm.durationMinutes} onChange={(e) => updateRouteForm('durationMinutes', e.target.value)} required />
+              </label>
+              <label className="admin-field admin-field-wide">
+                <span>Stops and ETA *</span>
+                <textarea
+                  rows={4}
+                  value={routeForm.stopsText}
+                  onChange={(e) => updateRouteForm('stopsText', e.target.value)}
+                  placeholder={'Elements Mall | 20\nMansarovar Metro Station | 30'}
+                  required
+                />
+                <small>One stop per line: stop name | minutes after departure</small>
+              </label>
+            </div>
+            <div className="admin-form-actions">
+              <button type="button" className="admin-btn admin-btn-ghost" onClick={() => setShowRouteForm(false)}>Close</button>
+              <button type="submit" className="admin-btn admin-btn-primary" disabled={routeSaving}>
+                {routeSaving ? 'Saving…' : editingRouteId ? 'Save changes' : 'Create route'}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {routes.length === 0 && <div className="admin-empty">No routes available yet.</div>}
+        {routes.length > 0 && (
+          <ul className="admin-route-list">
+            {routes.map((route) => (
+              <li key={route._id} className="admin-route-item">
+                <div>
+                  <strong><MapPin size={15} /> {route.name}</strong>
+                  <span>{route.origin} → {route.destination} · {route.availableStops.length} stop{route.availableStops.length === 1 ? '' : 's'} · {route.durationMinutes} min</span>
+                </div>
+                <div className="admin-slot-actions">
+                  <button type="button" className="admin-btn admin-btn-ghost" onClick={() => openEditRoute(route)}>
+                    <Edit3 size={15} /><span>Edit</span>
+                  </button>
+                  <button type="button" className="admin-btn admin-btn-danger" onClick={() => handleDeleteRoute(route)}>
+                    <Trash2 size={15} /><span>Delete</span>
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <div id="admin-cancellations" className="admin-section-anchor" aria-hidden="true" />
 
