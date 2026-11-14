@@ -217,7 +217,7 @@ const AdminDashboard = ({ onUnauthorized }) => {
 
   return (
     <div className="admin-dashboard">
-      <div className="admin-head no-print">
+      <div id="admin-overview" className="admin-head no-print">
         <div>
           <h2 className="admin-title">Admin dashboard</h2>
           <p className="admin-sub">Shuttle load, extra shuttles, cancellations and passenger lists</p>
@@ -250,6 +250,31 @@ const AdminDashboard = ({ onUnauthorized }) => {
           <button type="button" className="admin-icon-btn" onClick={() => setNotice('')} aria-label="Dismiss message">
             <X size={14} />
           </button>
+        </div>
+      )}
+
+      {load && (
+        <div className="admin-kpi-grid" aria-label="Shuttle operations summary">
+          <div className="admin-kpi-card">
+            <span className="admin-kpi-label">Total capacity</span>
+            <strong>{totals.seats}</strong>
+            <span className="admin-kpi-detail">Seats across scheduled shuttles</span>
+          </div>
+          <div className="admin-kpi-card admin-kpi-card-red">
+            <span className="admin-kpi-label">Seats booked</span>
+            <strong>{totals.booked}</strong>
+            <span className="admin-kpi-detail">{totals.seats ? Math.round((totals.booked / totals.seats) * 100) : 0}% utilization</span>
+          </div>
+          <div className="admin-kpi-card admin-kpi-card-amber">
+            <span className="admin-kpi-label">Busy shuttles</span>
+            <strong>{totals.busy}</strong>
+            <span className="admin-kpi-detail">Nearly full or at capacity</span>
+          </div>
+          <div className="admin-kpi-card admin-kpi-card-slate">
+            <span className="admin-kpi-label">Cancellations</span>
+            <strong>{totals.cancelled}</strong>
+            <span className="admin-kpi-detail">Shuttles cancelled today</span>
+          </div>
         </div>
       )}
 
@@ -308,8 +333,10 @@ const AdminDashboard = ({ onUnauthorized }) => {
         </form>
       )}
 
+      <div id="admin-cancellations" className="admin-section-anchor" aria-hidden="true" />
+
       {/* Load view */}
-      <section className="admin-panel no-print" aria-labelledby="admin-load-title">
+      <section id="admin-shuttles" className="admin-panel no-print" aria-labelledby="admin-load-title">
         <div className="admin-panel-head">
           <h3 id="admin-load-title" className="admin-panel-title">Seats booked on {formatDate(date)}</h3>
           {load && (
@@ -405,7 +432,7 @@ const AdminDashboard = ({ onUnauthorized }) => {
 
       {/* Passenger list (the only part that prints) */}
       {passengerSlot && (
-        <section className="admin-panel admin-print-area" ref={passengerRef} aria-labelledby="admin-pax-title">
+        <section id="admin-passengers" className="admin-panel admin-print-area" ref={passengerRef} aria-labelledby="admin-pax-title">
           <div className="admin-panel-head">
             <div>
               <h3 id="admin-pax-title" className="admin-panel-title">

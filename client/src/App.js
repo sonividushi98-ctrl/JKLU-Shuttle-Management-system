@@ -26,10 +26,8 @@ import {
   LogIn,
   LogOut,
   ShieldCheck,
-  LayoutDashboard,
   AlertTriangle
 } from 'lucide-react';
-import AdminDashboard from './AdminDashboard';
 import { getStoredToken, clearStoredAuth } from './api/session';
 import {
   OFFICIAL_TRIPS,
@@ -49,6 +47,11 @@ import './Trips.css';
 
 const API_BASE = 'http://localhost:5000/api/bookings';
 const AUTH_API = 'http://localhost:5000/api/auth';
+
+const navigateTo = (path) => {
+  window.history.pushState({}, '', path);
+  window.dispatchEvent(new PopStateEvent('popstate'));
+};
 
 // Official JKLU Shuttle Service timetable, Academic Year 2026-27.
 // Each route is split into legs; each stop row is [label, place, time].
@@ -307,6 +310,13 @@ const App = () => {
       });
   }, []);
 
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('admin') === '1') {
+      setShowAuthModal(true);
+      setAuthMode('login');
+    }
+  }, []);
+
   // Keep passenger info synced whenever currentUser updates
   useEffect(() => {
     if (currentUser) {
@@ -333,11 +343,6 @@ const App = () => {
   // ADMIN ROLE & ADMIN CANCELLATIONS
   // ==========================================
   const isAdmin = currentUser?.role === 'Admin';
-
-  // The Admin tab only exists for Admins; anyone else is sent back to booking
-  useEffect(() => {
-    if (currentTab === 'admin' && !isAdmin) setCurrentTab('book');
-  }, [currentTab, isAdmin]);
 
   // Pull this student's bookings from the server so status changes made by an admin
   // (status Cancelled + cancelReason) show up. Local-only trips are kept as they are.
@@ -645,6 +650,9 @@ const App = () => {
       setTimeout(() => {
         setShowAuthModal(false);
         setAuthLoading(false);
+        if (user.role === 'Admin') {
+          navigateTo('/admin/dashboard');
+        }
       }, 500);
     } catch (err) {
       // Never sign anyone in without the server's approval.
@@ -663,16 +671,6 @@ const App = () => {
     clearStoredAuth();
     setCurrentUser(null);
   };
-
-  // An admin request came back 401: the session is no longer valid
-  const handleAdminSessionExpired = useCallback(() => {
-    clearStoredAuth();
-    setCurrentUser(null);
-    setAuthMode('login');
-    setAuthSuccess('');
-    setAuthError('Your session has expired. Please sign in again.');
-    setShowAuthModal(true);
-  }, []);
 
   // Date shortcuts
   const dateOptions = useMemo(() => {
@@ -842,15 +840,6 @@ const App = () => {
               <Clock size={15} />
               Timetable
             </button>
-            {isAdmin && (
-              <button
-                className={`segmented-nav-btn ${currentTab === 'admin' ? 'active' : ''}`}
-                onClick={() => setCurrentTab('admin')}
-              >
-                <LayoutDashboard size={15} />
-                Admin
-              </button>
-            )}
           </nav>
 
           {/* User Account / Remember Me Badge & Operations Status */}
@@ -891,7 +880,7 @@ const App = () => {
       {/* Main Container */}
       <main className="main-wrapper">
         {/* Student notice: bookings cancelled by the transport office */}
-        {bannerCancellations.length > 0 && currentTab !== 'admin' && (
+        {bannerCancellations.length > 0 && (
           <div className="cancel-banner no-print" role="alert">
             <AlertTriangle size={20} className="cancel-banner-icon" />
             <div className="cancel-banner-body">
@@ -917,13 +906,6 @@ const App = () => {
               </div>
             </div>
           </div>
-        )}
-
-        {/* ========================================================================= */}
-        {/* ADMIN DASHBOARD (Admins only) */}
-        {/* ========================================================================= */}
-        {currentTab === 'admin' && isAdmin && (
-          <AdminDashboard onUnauthorized={handleAdminSessionExpired} />
         )}
 
         {/* ========================================================================= */}
