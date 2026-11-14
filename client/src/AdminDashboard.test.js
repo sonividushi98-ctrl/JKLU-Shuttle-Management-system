@@ -50,4 +50,13 @@ describe('Admin shuttle form', () => {
     expect(await screen.findByLabelText('Date')).toHaveAttribute('max', expectedMax);
   });
 
+  test('keeps the passenger table visible with a no-bookings row', async () => {
+    render(<AdminDashboard onUnauthorized={jest.fn()} />);
+
+    expect(await screen.findByText('No bookings')).toBeInTheDocument();
+    ['Shuttle', 'Seat', 'Name', 'Roll no.', 'Email', 'Stop', 'Booking code'].forEach((heading) => {
+      expect(screen.getByRole('columnheader', { name: heading })).toBeInTheDocument();
+    });
+  });
+
 });

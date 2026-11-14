@@ -740,7 +740,7 @@ const AdminDashboard = ({ onUnauthorized }) => {
         {!dailyPassengersLoading && !dailyPassengersError && dailyPassengers?.count === 0 && (
           <div className="admin-empty">No confirmed passengers for this date. The empty report can still be printed.</div>
         )}
-        {!dailyPassengersLoading && !dailyPassengersError && dailyPassengers?.count > 0 && (
+        {!dailyPassengersLoading && !dailyPassengersError && (
           <div className="admin-table-wrap">
             <table className="admin-table">
               <thead>
@@ -755,7 +755,7 @@ const AdminDashboard = ({ onUnauthorized }) => {
                 </tr>
               </thead>
               <tbody>
-                {dailyPassengers.passengers.map((passenger) => (
+                {dailyPassengers?.count > 0 ? dailyPassengers.passengers.map((passenger) => (
                   <tr key={passenger._id}>
                     <td>
                       <strong>{passenger.slot.time} · {passenger.slot.busNumber}</strong>
@@ -772,7 +772,17 @@ const AdminDashboard = ({ onUnauthorized }) => {
                     <td className="admin-stop-cell">{passenger.stop}</td>
                     <td>{passenger.bookingCode}</td>
                   </tr>
-                ))}
+                )) : (
+                  <tr>
+                    <td>—</td>
+                    <td>—</td>
+                    <td><strong>No bookings</strong></td>
+                    <td>—</td>
+                    <td>—</td>
+                    <td>—</td>
+                    <td>—</td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

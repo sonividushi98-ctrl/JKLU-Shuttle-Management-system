@@ -1153,3 +1153,23 @@
     margin: 0 !important;
   }
 }
+
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+
+  .admin-daily-report,
+  .admin-daily-report * {
+    visibility: visible !important;
+  }
+
+  .admin-daily-report {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+  }
+}
