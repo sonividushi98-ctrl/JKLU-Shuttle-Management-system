@@ -82,6 +82,13 @@
   text-align: right;
 }
 
+.admin-field-hint {
+  display: inline !important;
+  margin-left: 4px;
+  text-align: initial !important;
+  font-size: 0.65rem;
+}
+
 .admin-date-field input:focus-visible,
 .admin-field input:focus-visible,
 .admin-field select:focus-visible,

@@ -15,6 +15,10 @@ import { adminErrorMessage, cancelSlot, createSlot, getPassengers, getSlotLoad }
 const NEARLY_FULL = 0.8;
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const PERIODS = ['Morning', 'Afternoon', 'Evening', 'Night'];
+const BUS_TYPES = [
+  { value: 'Bus', defaultSeats: 30 },
+  { value: 'Travellor', defaultSeats: 19 }
+];
 
 // Today's date in the viewer's own time zone, as YYYY-MM-DD
 const localToday = () => {
@@ -41,15 +45,15 @@ const loadInfo = (slot) => {
   };
 };
 
-const EMPTY_FORM = {
+const createEmptyForm = () => ({
   time: '',
   busNumber: '',
-  busType: '',
-  totalSeats: 32,
+  busType: 'Bus',
+  totalSeats: 30,
   period: '',
   direction: 'Campus to City',
   days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
-};
+});
 
 const AdminDashboard = ({ onUnauthorized }) => {
   const [date, setDate] = useState(localToday);
@@ -59,7 +63,8 @@ const AdminDashboard = ({ onUnauthorized }) => {
   const [notice, setNotice] = useState('');
 
   const [showAddForm, setShowAddForm] = useState(false);
-  const [form, setForm] = useState(EMPTY_FORM);
+  const [form, setForm] = useState(createEmptyForm);
+  const [seatCapacityEdited, setSeatCapacityEdited] = useState(false);
   const [formError, setFormError] = useState('');
   const [formSaving, setFormSaving] = useState(false);
 
@@ -131,7 +136,14 @@ const AdminDashboard = ({ onUnauthorized }) => {
   }, [cancelTarget, cancelStep]);
 
   // ---------- Add shuttle ----------
-  const updateForm = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
+  const updateForm = (field, value) => setForm((prev) => {
+    const next = { ...prev, [field]: value };
+    if (field === 'busType' && !seatCapacityEdited) {
+      const type = BUS_TYPES.find((option) => option.value === value);
+      next.totalSeats = type ? type.defaultSeats : 30;
+    }
+    return next;
+  });
 
   const toggleDay = (day) =>
     setForm((prev) => ({
@@ -160,7 +172,8 @@ const AdminDashboard = ({ onUnauthorized }) => {
 
       const data = await createSlot(payload);
       setNotice(`${data.message} ${data.slot.time} · ${data.slot.busNumber}`);
-      setForm(EMPTY_FORM);
+      setForm(createEmptyForm());
+      setSeatCapacityEdited(false);
       setShowAddForm(false);
       refreshLoad();
     } catch (err) {
@@ -294,17 +307,31 @@ const AdminDashboard = ({ onUnauthorized }) => {
             </label>
             <label className="admin-field">
               <span>Bus type</span>
-              <input type="text" placeholder="AC Executive Shuttle" value={form.busType} onChange={(e) => updateForm('busType', e.target.value)} />
+              <select value={form.busType} onChange={(e) => updateForm('busType', e.target.value)}>
+                {BUS_TYPES.map((type) => (
+                  <option key={type.value} value={type.value}>{type.value}</option>
+                ))}
+              </select>
             </label>
             <label className="admin-field">
-              <span>Seats</span>
-              <input type="number" min="4" max="60" step="4" value={form.totalSeats} onChange={(e) => updateForm('totalSeats', e.target.value)} />
+              <span>Seats <small className="admin-field-hint">Editable</small></span>
+              <input
+                type="number"
+                min="4"
+                max="60"
+                step="1"
+                value={form.totalSeats}
+                onChange={(e) => {
+                  setSeatCapacityEdited(true);
+                  updateForm('totalSeats', e.target.value);
+                }}
+              />
             </label>
             <label className="admin-field">
               <span>Direction</span>
               <select value={form.direction} onChange={(e) => updateForm('direction', e.target.value)}>
-                <option value="Campus to City">Campus ➔ Elements Mall, Mansarovar Metro</option>
-                <option value="City to Campus">Mansarovar Metro, Elements Mall ➔ Campus</option>
+                <option value="Campus to City">Campus → City</option>
+                <option value="City to Campus">City → Campus</option>
               </select>
             </label>
             <label className="admin-field">
