@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const mongoose = require('mongoose');
 const Slot = require('../models/Slot');
 const Booking = require('../models/Booking');
+const Route = require('../models/Route');
 const { memoryStore } = require('./bookingController');
 
 const isDbConnected = () => mongoose.connection.readyState === 1;
@@ -185,7 +186,8 @@ exports.createSlot = async (req, res) => {
       origin,
       destination,
       availableStops,
-      days
+      days,
+      routeId
     } = req.body || {};
 
     const cleanTime = normalizeTime(time);
@@ -223,6 +225,20 @@ exports.createSlot = async (req, res) => {
 
     // Start from the standard Route 1 stops for the chosen direction; any fields sent override them
     Object.assign(slotData, direction === 'City to Campus' ? CITY_TO_CAMPUS_DEFAULTS : CAMPUS_TO_CITY_DEFAULTS);
+    if (routeId) {
+      const route = isDbConnected()
+        ? (mongoose.isValidObjectId(routeId) ? await Route.findById(routeId) : null)
+        : memoryStore.routes.find(item => item._id === routeId);
+      if (!route) return res.status(400).json({ message: 'Selected route was not found' });
+      slotData.routeId = route._id;
+      slotData.routeName = route.name;
+      slotData.direction = route.direction;
+      slotData.origin = route.origin;
+      slotData.destination = route.destination;
+      slotData.availableStops = route.availableStops;
+      slotData.etaMinutes = route.etaMinutes;
+      slotData.durationMinutes = route.durationMinutes;
+    }
     if (busType) slotData.busType = String(busType).trim();
     if (origin) slotData.origin = String(origin).trim();
     if (destination) slotData.destination = String(destination).trim();

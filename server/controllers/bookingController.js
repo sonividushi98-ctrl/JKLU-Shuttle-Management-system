@@ -1,7 +1,9 @@
 const mongoose = require('mongoose');
 const Slot = require('../models/Slot');
 const Booking = require('../models/Booking');
+const Route = require('../models/Route');
 const { OFFICIAL_TRIPS } = require('../data/officialTrips');
+const defaultRoutes = require('../data/defaultRoutes');
 
 // Official JKLU 3 Shuttle Stops
 const JKLU_STOPS = [
@@ -42,6 +44,11 @@ const DEFAULT_SLOTS = OFFICIAL_TRIPS.map(t => ({
   availableStops: [...t.availableStops],
   etaMinutes: { ...t.etaMinutes }
 }));
+
+const DEFAULT_ROUTE_IDS = {
+  'Route 1': 'route-1',
+  'Route 2': 'route-2'
+};
 
 // In-memory fallback stores when MongoDB is offline
 let memoryBookings = [
@@ -85,7 +92,17 @@ const cancellationFor = (slot, date) =>
 
 // Shared in-memory stores, used by the admin controller's offline fallback.
 // These are the same array objects the routes above read and write.
-exports.memoryStore = { slots: DEFAULT_SLOTS, bookings: memoryBookings };
+exports.memoryStore = {
+  slots: DEFAULT_SLOTS.map(slot => ({ ...slot, routeId: DEFAULT_ROUTE_IDS[slot.routeName] })),
+  bookings: memoryBookings,
+  routes: defaultRoutes.map((route, index) => ({
+    ...route,
+    _id: `route-${index + 1}`,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  }))
+};
+const memoryStore = exports.memoryStore;
 
 exports.getStops = (req, res) => {
   res.json({
@@ -111,10 +128,32 @@ exports.getSlots = async (req, res) => {
         await seedingSlots;
         slots = await Slot.find();
       }
-      return res.json(slots);
+      let routes = await Route.find();
+      if (!routes.length) {
+        await Route.insertMany(defaultRoutes);
+        routes = await Route.find();
+      }
+      const routesByName = new Map(routes.map(route => [route.name, route]));
+      return res.json(slots.map(slot => {
+        const route = slot.routeId ? routes.find(item => String(item._id) === String(slot.routeId)) : routesByName.get(slot.routeName);
+        return route ? {
+          ...slot.toObject(),
+          routeName: route.name,
+          origin: route.origin,
+          destination: route.destination,
+          availableStops: route.availableStops,
+          etaMinutes: route.etaMinutes,
+          durationMinutes: route.durationMinutes,
+          direction: slot.routeId ? route.direction : slot.direction
+        } : slot;
+      }));
     }
     // Return memory slots
-    return res.json(DEFAULT_SLOTS);
+    const routesById = new Map(memoryStore.routes.map(route => [route._id, route]));
+    return res.json(memoryStore.slots.map(slot => {
+      const route = routesById.get(slot.routeId) || memoryStore.routes.find(item => item.name === slot.routeName);
+      return route ? { ...slot, routeName: route.name, direction: slot.routeId ? route.direction : slot.direction, origin: route.origin, destination: route.destination, availableStops: route.availableStops, etaMinutes: route.etaMinutes, durationMinutes: route.durationMinutes } : slot;
+    }));
   } catch (err) {
     console.error('getSlots fallback error:', err.message);
     return res.json(DEFAULT_SLOTS);
