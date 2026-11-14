@@ -11,4 +11,10 @@ router.post('/slots', adminController.createSlot);
 router.post('/slots/:slotId/cancel', adminController.cancelSlot);
 router.get('/slots/:slotId/passengers', adminController.getPassengers);
 
+const routeController = require('../controllers/routeController');
+router.get('/routes', routeController.listRoutes);
+router.post('/routes', routeController.createRoute);
+router.put('/routes/:routeId', routeController.updateRoute);
+router.delete('/routes/:routeId', routeController.deleteRoute);
+
 module.exports = router;

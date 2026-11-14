@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const slotSchema = new mongoose.Schema({
   time: { type: String, required: true }, // e.g., "01:30 PM"
   routeName: { type: String, default: '' }, // e.g. "Route 1" on the official timetable
+  routeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Route' },
   durationMinutes: { type: Number }, // departure to final arrival
   period: { type: String, enum: ['Morning', 'Afternoon', 'Evening', 'Night'], default: 'Morning' },
   direction: { type: String, default: 'Campus to City' }, // or 'City to Campus'
