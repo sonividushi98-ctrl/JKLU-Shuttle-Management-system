@@ -29,6 +29,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { getStoredToken, clearStoredAuth } from './api/session';
+import SignOutConfirm from './SignOutConfirm';
 import {
   OFFICIAL_TRIPS,
   CAMPUS,
@@ -254,6 +255,7 @@ const App = () => {
   });
 
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
   const [authMode, setAuthMode] = useState('login'); // 'login' | 'signup'
   const [authName, setAuthName] = useState('');
   const [authEmail, setAuthEmail] = useState('');
@@ -670,6 +672,7 @@ const App = () => {
   const handleSignOut = () => {
     clearStoredAuth();
     setCurrentUser(null);
+    setShowSignOutConfirm(false);
   };
 
   // Date shortcuts
@@ -854,7 +857,7 @@ const App = () => {
                   <div className="user-roll-tag">{isAdmin ? 'ADMIN' : currentUser.rollNumber || 'STUDENT'}</div>
                 </div>
                 <button
-                  onClick={(e) => { e.stopPropagation(); handleSignOut(); }}
+                  onClick={(e) => { e.stopPropagation(); setShowSignOutConfirm(true); }}
                   style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '2px', color: '#94A3B8' }}
                   title="Sign Out"
                 >
@@ -2481,6 +2484,12 @@ const App = () => {
             </div>
           </div>
         </div>
+      )}
+      {showSignOutConfirm && (
+        <SignOutConfirm
+          onCancel={() => setShowSignOutConfirm(false)}
+          onConfirm={handleSignOut}
+        />
       )}
     </div>
   );

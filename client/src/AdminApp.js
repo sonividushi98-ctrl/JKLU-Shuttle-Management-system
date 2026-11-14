@@ -16,6 +16,7 @@ import {
 import { useLocation, useNavigate } from 'react-router-dom';
 import AdminDashboard from './AdminDashboard';
 import { clearStoredAuth, getStoredToken } from './api/session';
+import SignOutConfirm from './SignOutConfirm';
 import './Admin.css';
 
 const AUTH_API = 'http://localhost:5000/api/auth';
@@ -27,6 +28,7 @@ const AdminApp = () => {
   const [checkingSession, setCheckingSession] = useState(true);
   const [sessionError, setSessionError] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
 
   useEffect(() => {
     const token = getStoredToken();
@@ -62,6 +64,7 @@ const AdminApp = () => {
   const handleSignOut = () => {
     clearStoredAuth();
     navigate('/', { replace: true });
+    setShowSignOutConfirm(false);
   };
 
   const handleUnauthorized = () => {
@@ -144,7 +147,7 @@ const AdminApp = () => {
               <span>Administrator</span>
             </div>
           </div>
-          <button type="button" className="admin-signout" onClick={handleSignOut}>
+          <button type="button" className="admin-signout" onClick={() => setShowSignOutConfirm(true)}>
             <LogOut size={15} />
             Sign out
           </button>
@@ -172,6 +175,12 @@ const AdminApp = () => {
           <AdminDashboard onUnauthorized={handleUnauthorized} />
         </div>
       </main>
+      {showSignOutConfirm && (
+        <SignOutConfirm
+          onCancel={() => setShowSignOutConfirm(false)}
+          onConfirm={handleSignOut}
+        />
+      )}
     </div>
   );
 };
