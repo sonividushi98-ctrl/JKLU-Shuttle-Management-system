@@ -355,6 +355,11 @@
   background: #F8FAFC;
 }
 
+.admin-slot-cancelled {
+  background: #FFF7F7;
+  border-color: #FECACA;
+}
+
 .admin-slot-time {
   font-size: 1.05rem;
   font-weight: 800;

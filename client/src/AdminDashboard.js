@@ -369,6 +369,8 @@ const AdminDashboard = ({ onUnauthorized }) => {
 
   // ---------- Render ----------
   const slots = load?.slots || [];
+  const activeSlots = slots.filter((slot) => !slot.cancelled);
+  const cancelledSlots = slots.filter((slot) => slot.cancelled);
   const maxReportDate = localDateOffset(2);
   const totals = slots.reduce(
     (acc, s) => {
@@ -615,7 +617,66 @@ const AdminDashboard = ({ onUnauthorized }) => {
         )}
       </section>
 
-      <div id="admin-cancellations" className="admin-section-anchor" aria-hidden="true" />
+      <section id="admin-cancellations" className="admin-panel no-print" aria-labelledby="admin-cancellations-title">
+        <div className="admin-panel-head">
+          <div>
+            <h3 id="admin-cancellations-title" className="admin-panel-title">Cancellations · {formatDate(date)}</h3>
+            <p className="admin-stats">Shuttles cancelled for the selected date appear here.</p>
+          </div>
+          {cancelledSlots.length > 0 && <span className="admin-badge admin-badge-full">{cancelledSlots.length} cancelled</span>}
+        </div>
+
+        {cancelledSlots.length === 0 && (
+          <div className="admin-empty">No shuttles cancelled for this date.</div>
+        )}
+
+        {cancelledSlots.length > 0 && (
+          <ul className="admin-slot-list">
+            {cancelledSlots.map((slot) => (
+              <li key={slot._id} className="admin-slot admin-slot-cancelled">
+                <div className="admin-slot-main">
+                  <div className="admin-slot-time">{slot.time}</div>
+                  <div className="admin-slot-meta">
+                    <span className="admin-slot-bus">{slot.busNumber}</span>
+                    <span>
+                      {slot.routeName ? `${slot.routeName} · ` : ''}
+                      {slot.direction === 'City to Campus' ? 'City ➔ Campus' : 'Campus ➔ City'} · {slot.period}
+                    </span>
+                  </div>
+                  <div className="admin-badges">
+                    <span className="admin-badge admin-badge-full">Cancelled for this date</span>
+                    {slot.cancelledByAdmin > 0 && (
+                      <span className="admin-badge admin-badge-cancel">
+                        {slot.cancelledByAdmin} booking{slot.cancelledByAdmin === 1 ? '' : 's'} cancelled
+                      </span>
+                    )}
+                  </div>
+                  <div className="admin-slot-reason">Reason: {slot.cancelReason}</div>
+                </div>
+                <div className="admin-slot-load">
+                  <div className="admin-load-label">
+                    <span><strong>{slot.bookedSeats}</strong> / {slot.totalSeats} booked</span>
+                    <span>{loadInfo(slot).percent}%</span>
+                  </div>
+                  <div className="admin-load-bar" role="progressbar" aria-valuemin={0} aria-valuemax={slot.totalSeats} aria-valuenow={slot.bookedSeats} aria-label={`${slot.time} seats booked`}>
+                    <div className="admin-load-fill" style={{ width: `${Math.min(loadInfo(slot).percent, 100)}%` }} />
+                  </div>
+                </div>
+                <div className="admin-slot-actions">
+                  <button type="button" className="admin-btn admin-btn-ghost" onClick={() => loadPassengers(slot)}>
+                    <Users size={15} />
+                    <span>Passengers</span>
+                  </button>
+                  <button type="button" className="admin-btn admin-btn-danger" disabled>
+                    <XCircle size={15} />
+                    <span>Cancelled</span>
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       {/* Load view */}
       <section id="admin-shuttles" className="admin-panel no-print" aria-labelledby="admin-load-title">
@@ -639,13 +700,17 @@ const AdminDashboard = ({ onUnauthorized }) => {
           </div>
         )}
 
-        {!loading && !error && slots.length === 0 && (
-          <div className="admin-empty">No shuttles are set up yet. Use “Add shuttle” to create one.</div>
+        {!loading && !error && activeSlots.length === 0 && (
+          <div className="admin-empty">
+            {cancelledSlots.length > 0
+              ? 'All shuttles for this date are cancelled. See the Cancellations section above.'
+              : 'No shuttles are set up yet. Use “Add shuttle” to create one.'}
+          </div>
         )}
 
-        {slots.length > 0 && (
+        {activeSlots.length > 0 && (
           <ul className="admin-slot-list">
-            {slots.map((slot) => {
+            {activeSlots.map((slot) => {
               const info = loadInfo(slot);
               return (
                 <li key={slot._id} className={`admin-slot ${slot.runsOnDate && !slot.cancelled ? '' : 'admin-slot-off'}`}>
