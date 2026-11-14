@@ -314,7 +314,7 @@ const AdminDashboard = ({ onUnauthorized }) => {
               </select>
             </label>
             <label className="admin-field">
-              <span>Seats <small className="admin-field-hint">Editable</small></span>
+              <span>Seats <small className="admin-field-hint"></small></span>
               <input
                 type="number"
                 min="4"

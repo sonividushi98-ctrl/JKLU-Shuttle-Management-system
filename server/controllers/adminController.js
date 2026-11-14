@@ -37,6 +37,22 @@ const isValidDate = (date) => DATE_RE.test(date) && !Number.isNaN(new Date(date 
 
 const weekdayOf = (date) => WEEKDAYS[new Date(date + 'T00:00:00Z').getUTCDay()];
 
+const createdDateOf = (slot) => {
+  if (!slot?.createdAt) return null;
+  const parsed = new Date(slot.createdAt);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString().slice(0, 10);
+};
+
+const runsOnDate = (slot, date, weekday) => {
+  const matchesWeekday = !Array.isArray(slot.days) || slot.days.length === 0 || slot.days.includes(weekday);
+  if (!matchesWeekday) return false;
+
+  // Official timetable slots predate the admin-created schedule and must remain
+  // visible for historical dates. Extra shuttles start on their creation date.
+  const createdDate = slot.routeName ? null : createdDateOf(slot);
+  return !createdDate || date >= createdDate;
+};
+
 // "7:05 pm" -> "07:05 PM" (the format the existing slots use)
 const normalizeTime = (time) => {
   const match = TIME_RE.exec(String(time || '').trim());
@@ -73,7 +89,8 @@ const slotSummary = (slot) => ({
   busNumber: slot.busNumber,
   busType: slot.busType,
   totalSeats: slot.totalSeats,
-  days: slot.days
+  days: slot.days,
+  createdAt: slot.createdAt
 });
 
 // Finds a slot by id in MongoDB or the in-memory store. Returns null if not found.
@@ -129,6 +146,9 @@ exports.getSlotLoad = async (req, res) => {
 
     const weekday = weekdayOf(date);
     const result = slots
+      // Do not show admin-created extras on dates before they existed. Official
+      // timetable rows remain visible so admins can see their weekday status.
+      .filter(slot => slot.routeName || !createdDateOf(slot) || date >= createdDateOf(slot))
       .map(slot => {
         const id = String(slot._id);
         const bookedSeats = booked[id] || 0;
@@ -140,7 +160,7 @@ exports.getSlotLoad = async (req, res) => {
           bookedSeats,
           seatsLeft: Math.max(slot.totalSeats - bookedSeats, 0),
           cancelledByAdmin: cancelledByAdmin[id] || 0,
-          runsOnDate: !Array.isArray(slot.days) || slot.days.length === 0 || slot.days.includes(weekday)
+          runsOnDate: runsOnDate(slot, date, weekday)
         };
       })
       .sort((a, b) => minutesOf(a.time) - minutesOf(b.time));
@@ -219,6 +239,7 @@ exports.createSlot = async (req, res) => {
       _id: crypto.randomBytes(12).toString('hex'),
       busType: 'AC Executive Shuttle',
       days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+      createdAt: new Date().toISOString(),
       ...slotData
     };
     memoryStore.slots.push(memSlot);

@@ -124,6 +124,20 @@ export const tripEnds = (slot, stop) =>
 // Weekday name for a 'YYYY-MM-DD' date
 export const weekdayOf = (date) => DAY_NAMES[new Date(`${date}T00:00:00Z`).getUTCDay()];
 
+const createdDateOf = (slot) => {
+  if (!slot?.createdAt) return null;
+  const parsed = new Date(slot.createdAt);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString().slice(0, 10);
+};
+
 // Whether a trip runs on a date (trips without a day list run every day)
-export const runsOn = (slot, date) =>
-  !Array.isArray(slot?.days) || slot.days.length === 0 || slot.days.includes(weekdayOf(date));
+export const runsOn = (slot, date) => {
+  const matchesWeekday =
+    !Array.isArray(slot?.days) || slot.days.length === 0 || slot.days.includes(weekdayOf(date));
+  if (!matchesWeekday) return false;
+
+  // Official timetable trips have route names; admin-created extras begin on
+  // their creation date instead of appearing in historical schedules.
+  const createdDate = slot?.routeName ? null : createdDateOf(slot);
+  return !createdDate || date >= createdDate;
+};
