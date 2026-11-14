@@ -538,6 +538,11 @@
   border-bottom: 1px solid #F1F5F9;
 }
 
+.admin-table-secondary {
+  color: var(--apple-text-secondary);
+  font-size: 0.72rem;
+}
+
 .admin-seat-cell {
   font-weight: 800;
 }
@@ -1136,5 +1141,15 @@
   .admin-table td {
     border-bottom: 1px solid #999;
     color: #000;
+  }
+
+  .admin-sidebar,
+  .admin-topbar {
+    display: none !important;
+  }
+
+  .admin-main {
+    width: 100% !important;
+    margin: 0 !important;
   }
 }

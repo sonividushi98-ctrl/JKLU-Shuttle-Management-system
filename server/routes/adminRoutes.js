@@ -8,6 +8,7 @@ router.use(adminOnly);
 
 router.get('/slots/load', adminController.getSlotLoad);
 router.post('/slots', adminController.createSlot);
+router.get('/slots/passengers', adminController.getDailyPassengers);
 router.post('/slots/:slotId/cancel', adminController.cancelSlot);
 router.get('/slots/:slotId/passengers', adminController.getPassengers);
 

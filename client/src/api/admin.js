@@ -40,3 +40,6 @@ export const cancelSlot = (slotId, date, reason) =>
 
 export const getPassengers = (slotId, date) =>
   adminApi.get(`/slots/${slotId}/passengers`, { params: { date } }).then((res) => res.data);
+
+export const getDailyPassengers = (date) =>
+  adminApi.get('/slots/passengers', { params: { date } }).then((res) => res.data);

@@ -32,7 +32,22 @@ const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frida
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^(0?[1-9]|1[0-2]):([0-5]\d)\s*(AM|PM)$/i;
 
-const today = () => new Date().toISOString().split('T')[0];
+const today = () => {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+};
+
+const addDays = (date, amount) => {
+  const value = new Date(`${date}T00:00:00Z`);
+  value.setUTCDate(value.getUTCDate() + amount);
+  return value.toISOString().split('T')[0];
+};
 
 const isValidDate = (date) => DATE_RE.test(date) && !Number.isNaN(new Date(date + 'T00:00:00Z').getTime());
 
@@ -363,5 +378,61 @@ exports.getPassengers = async (req, res) => {
     return res.json({ slot: slotSummary(slot), date, count: passengers.length, passengers });
   } catch (err) {
     res.status(500).json({ message: 'Error retrieving passenger list', error: err.message });
+  }
+};
+
+// @desc    Confirmed passengers across every shuttle on a date
+// @route   GET /api/admin/slots/passengers?date=YYYY-MM-DD
+exports.getDailyPassengers = async (req, res) => {
+  try {
+    const date = req.query.date || today();
+    if (!isValidDate(date)) {
+      return res.status(400).json({ message: 'date must be in YYYY-MM-DD format' });
+    }
+    if (date > addDays(today(), 2)) {
+      return res.status(400).json({ message: 'Passenger reports are available only through the day after tomorrow' });
+    }
+
+    let slots;
+    let bookings;
+    if (isDbConnected()) {
+      [slots, bookings] = await Promise.all([
+        Slot.find(),
+        Booking.find({ date, status: 'Confirmed' }).sort({ seatNumber: 1 })
+      ]);
+    } else {
+      slots = memoryStore.slots;
+      bookings = memoryStore.bookings
+        .filter(booking => booking.date === date && booking.status === 'Confirmed')
+        .sort((a, b) => a.seatNumber - b.seatNumber);
+    }
+
+    const slotsById = new Map(slots.map(slot => [String(slot._id), slot]));
+    const passengers = bookings
+      .map(booking => {
+        const slot = slotsById.get(slotIdOf(booking));
+        if (!slot) return null;
+        return {
+          _id: booking._id,
+          passengerName: booking.passengerName,
+          passengerRoll: booking.passengerRoll,
+          passengerEmail: booking.passengerEmail,
+          seatNumber: booking.seatNumber,
+          stop: booking.stop,
+          bookingCode: booking.bookingCode,
+          slot: slotSummary(slot)
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => minutesOf(a.slot.time) - minutesOf(b.slot.time) || a.seatNumber - b.seatNumber);
+
+    return res.json({
+      date,
+      weekday: weekdayOf(date),
+      count: passengers.length,
+      passengers
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Error retrieving daily passenger report', error: err.message });
   }
 };

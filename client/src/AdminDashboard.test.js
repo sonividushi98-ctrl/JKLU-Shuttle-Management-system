@@ -5,6 +5,7 @@ jest.mock('./api/admin', () => ({
   adminErrorMessage: jest.fn(() => 'Admin request failed'),
   cancelSlot: jest.fn(),
   createSlot: jest.fn(),
+  getDailyPassengers: jest.fn(() => Promise.resolve({ count: 0, passengers: [] })),
   getRoutes: jest.fn(() => Promise.resolve([])),
   getPassengers: jest.fn(),
   getSlotLoad: jest.fn(() => Promise.resolve({ slots: [] }))
@@ -38,6 +39,15 @@ describe('Admin shuttle form', () => {
     fireEvent.change(seatInput, { target: { value: '24' } });
     fireEvent.change(typeSelect, { target: { value: 'Bus' } });
     expect(seatInput).toHaveValue(24);
+  });
+
+  test('caps passenger report dates at the day after tomorrow', async () => {
+    render(<AdminDashboard onUnauthorized={jest.fn()} />);
+    const maxDate = new Date();
+    maxDate.setDate(maxDate.getDate() + 2);
+    const expectedMax = `${maxDate.getFullYear()}-${String(maxDate.getMonth() + 1).padStart(2, '0')}-${String(maxDate.getDate()).padStart(2, '0')}`;
+
+    expect(await screen.findByLabelText('Date')).toHaveAttribute('max', expectedMax);
   });
 
 });

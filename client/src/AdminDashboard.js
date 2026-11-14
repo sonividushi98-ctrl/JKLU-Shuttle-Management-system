@@ -19,6 +19,7 @@ import {
   createRoute,
   createSlot,
   deleteRoute,
+  getDailyPassengers,
   getPassengers,
   getRoutes,
   getSlotLoad,
@@ -37,6 +38,12 @@ const BUS_TYPES = [
 const localToday = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+const localDateOffset = (days) => {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 };
 
 // "18:10" (from <input type="time">) -> "06:10 PM"
@@ -116,6 +123,9 @@ const AdminDashboard = ({ onUnauthorized }) => {
   const [passengers, setPassengers] = useState(null);
   const [passengersLoading, setPassengersLoading] = useState(false);
   const [passengersError, setPassengersError] = useState('');
+  const [dailyPassengers, setDailyPassengers] = useState(null);
+  const [dailyPassengersLoading, setDailyPassengersLoading] = useState(true);
+  const [dailyPassengersError, setDailyPassengersError] = useState('');
 
   const passengerRef = useRef(null);
   const reasonRef = useRef(null);
@@ -169,11 +179,25 @@ const AdminDashboard = ({ onUnauthorized }) => {
     }
   }, [date, handleError]);
 
+  const loadDailyPassengers = useCallback(async () => {
+    setDailyPassengersLoading(true);
+    setDailyPassengersError('');
+    try {
+      setDailyPassengers(await getDailyPassengers(date));
+    } catch (err) {
+      setDailyPassengers(null);
+      handleError(err, setDailyPassengersError);
+    } finally {
+      setDailyPassengersLoading(false);
+    }
+  }, [date, handleError]);
+
   useEffect(() => {
     refreshLoad();
+    loadDailyPassengers();
     setPassengerSlot(null);
     setPassengers(null);
-  }, [refreshLoad]);
+  }, [refreshLoad, loadDailyPassengers]);
 
   useEffect(() => {
     if (passengerSlot && passengerRef.current) {
@@ -345,6 +369,7 @@ const AdminDashboard = ({ onUnauthorized }) => {
 
   // ---------- Render ----------
   const slots = load?.slots || [];
+  const maxReportDate = localDateOffset(2);
   const totals = slots.reduce(
     (acc, s) => {
       if (s.cancelled) {
@@ -369,7 +394,12 @@ const AdminDashboard = ({ onUnauthorized }) => {
         <div className="admin-head-actions">
           <label className="admin-date-field">
             <span>Date</span>
-            <input type="date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} />
+            <input
+              type="date"
+              value={date}
+              max={maxReportDate}
+              onChange={(e) => e.target.value && setDate(e.target.value)}
+            />
           </label>
           <button type="button" className="admin-btn admin-btn-ghost" onClick={refreshLoad} disabled={loading}>
             <RefreshCw size={15} className={loading ? 'admin-spin' : ''} />
@@ -682,9 +712,76 @@ const AdminDashboard = ({ onUnauthorized }) => {
         )}
       </section>
 
-      {/* Passenger list (the only part that prints) */}
+      {/* Daily passenger report */}
+      <section id="admin-passengers" className="admin-panel admin-print-area admin-daily-report" aria-labelledby="admin-daily-passengers-title">
+        <div className="admin-panel-head">
+          <div>
+            <h3 id="admin-daily-passengers-title" className="admin-panel-title">
+              Passenger lists · {formatDate(date)}
+            </h3>
+            <p className="admin-stats">
+              Confirmed passengers across all shuttles · {dailyPassengers?.count || 0} passenger{dailyPassengers?.count === 1 ? '' : 's'}
+            </p>
+          </div>
+          <div className="admin-head-actions no-print">
+            <button type="button" className="admin-btn admin-btn-ghost" onClick={loadDailyPassengers} disabled={dailyPassengersLoading}>
+              <RefreshCw size={15} className={dailyPassengersLoading ? 'admin-spin' : ''} />
+              <span>Refresh list</span>
+            </button>
+            <button type="button" className="admin-btn admin-btn-primary" onClick={() => window.print()}>
+              <Printer size={15} />
+              <span>Print report</span>
+            </button>
+          </div>
+        </div>
+
+        {dailyPassengersLoading && <div className="admin-empty">Loading passenger report…</div>}
+        {dailyPassengersError && <div className="admin-alert admin-alert-error" role="alert">{dailyPassengersError}</div>}
+        {!dailyPassengersLoading && !dailyPassengersError && dailyPassengers?.count === 0 && (
+          <div className="admin-empty">No confirmed passengers for this date. The empty report can still be printed.</div>
+        )}
+        {!dailyPassengersLoading && !dailyPassengersError && dailyPassengers?.count > 0 && (
+          <div className="admin-table-wrap">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th scope="col">Shuttle</th>
+                  <th scope="col">Seat</th>
+                  <th scope="col">Name</th>
+                  <th scope="col">Roll no.</th>
+                  <th scope="col">Email</th>
+                  <th scope="col">Stop</th>
+                  <th scope="col">Booking code</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dailyPassengers.passengers.map((passenger) => (
+                  <tr key={passenger._id}>
+                    <td>
+                      <strong>{passenger.slot.time} · {passenger.slot.busNumber}</strong>
+                      <br />
+                      <span className="admin-table-secondary">
+                        {passenger.slot.routeName ? `${passenger.slot.routeName} · ` : ''}
+                        {passenger.slot.direction === 'City to Campus' ? 'City ➔ Campus' : 'Campus ➔ City'}
+                      </span>
+                    </td>
+                    <td className="admin-seat-cell">{passenger.seatNumber}</td>
+                    <td>{passenger.passengerName}</td>
+                    <td>{passenger.passengerRoll}</td>
+                    <td>{passenger.passengerEmail}</td>
+                    <td className="admin-stop-cell">{passenger.stop}</td>
+                    <td>{passenger.bookingCode}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {/* Passenger list for one shuttle */}
       {passengerSlot && (
-        <section id="admin-passengers" className="admin-panel admin-print-area" ref={passengerRef} aria-labelledby="admin-pax-title">
+        <section id="admin-passenger-detail" className="admin-panel admin-print-area" ref={passengerRef} aria-labelledby="admin-pax-title">
           <div className="admin-panel-head">
             <div>
               <h3 id="admin-pax-title" className="admin-panel-title">
