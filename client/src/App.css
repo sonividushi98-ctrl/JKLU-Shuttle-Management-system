@@ -1969,7 +1969,7 @@ body {
 /* Driver & Activity Columns */
 .tracking-bottom-section {
   display: grid;
-  grid-template-columns: 340px 1fr;
+  grid-template-columns: 1fr;
   gap: 20px;
   padding: 0 30px 30px;
 }

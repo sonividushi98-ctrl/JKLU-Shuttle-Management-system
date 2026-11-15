@@ -10,7 +10,6 @@ import {
   ChevronRight,
   User,
   ArrowRight,
-  Sparkles,
   Download,
   X,
   Compass,
@@ -976,33 +975,6 @@ const App = () => {
         {/* ========================================================================= */}
         {currentTab === 'book' && (
           <div>
-            {/* Hero Minimal Banner */}
-            <div className="hero-card">
-              <div className="hero-subtitle">
-                <Sparkles size={14} /> Official JKLU Transport Portal
-              </div>
-              <h2 className="hero-title">Connecting JKLU Campus to City Transit</h2>
-              <p className="hero-desc">
-                High-frequency daily AC shuttles from JKLU Campus (Gate 1) directly serving the 3 prime city connection stops with reserved student & faculty seating.
-              </p>
-              
-              {/* Highlight the 3 Stops */}
-              <div className="stops-capsules">
-                <div className="stop-capsule">
-                  <span className="capsule-num">1</span>
-                  <span>200 Feet Bypass</span>
-                </div>
-                <div className="stop-capsule">
-                  <span className="capsule-num">2</span>
-                  <span>Elements Mall</span>
-                </div>
-                <div className="stop-capsule">
-                  <span className="capsule-num">3</span>
-                  <span>Mansarovar Metro Station</span>
-                </div>
-              </div>
-            </div>
-
             {/* RedBus Stepper Bar - Connected via Doubly Linked List */}
             <div className="stepper-container">
               {bookingStepList.toArray().map((stepNode) => {
@@ -1097,7 +1069,7 @@ const App = () => {
 
                   {/* Period Filter */}
                   <div className="chips-group">
-                    {['All', 'Morning', 'Afternoon', 'Evening', 'Night'].map(period => (
+                    {['All', 'Morning', 'Afternoon', 'Evening'].map(period => (
                       <button
                         key={period}
                         className={`chip-btn ${selectedPeriod === period ? 'active' : ''}`}
@@ -1872,23 +1844,17 @@ const App = () => {
               </div>
             </div>
 
-            {/* Telemetry Dashboard Stats - Live Speed and Distance Covered removed per user request */}
+            {/* Telemetry Dashboard Stats - Distance Remaining */}
             <div className="telemetry-dashboard-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
               <div className="telemetry-card">
                 <div className="telemetry-label">Distance Remaining</div>
                 <div className="telemetry-val">{(19.5 * (1 - trackingProgress / 100)).toFixed(1)} km</div>
                 <div className="telemetry-sub">to {activeTrackingSlot?.destination || 'Destination'}</div>
               </div>
-
-              <div className="telemetry-card">
-                <div className="telemetry-label">Traffic Condition</div>
-                <div className="telemetry-val" style={{ color: '#10B981', fontSize: '1.15rem' }}>Smooth Flow</div>
-                <div className="telemetry-sub">Ajmer Expressway Green</div>
-              </div>
             </div>
 
-            {/* Bottom Section: Driver Profile & Live Activity Feed */}
-            <div className="tracking-bottom-section">
+            {/* Bottom Section: Driver Profile */}
+            <div className="tracking-bottom-section" style={{ gridTemplateColumns: '1fr' }}>
               {/* Driver Details Card - type, security status, and 9 yrs service removed */}
               <div className="driver-info-card">
                 <div className="driver-profile-header">
@@ -1915,39 +1881,6 @@ const App = () => {
                   <Phone size={14} />
                   <span>Call Shuttle Driver ({activeDriver.phone})</span>
                 </a>
-              </div>
-
-              {/* Live Activity Feed */}
-              <div className="live-activity-log-card">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h4 style={{ fontSize: '0.95rem', fontWeight: 800 }}>Corridor Milestones & Activity</h4>
-                  <span style={{ fontSize: '0.72rem', color: '#10B981', fontWeight: 700 }}>● Live Feed</span>
-                </div>
-
-                <div className="activity-feed-list">
-                  {activeCorridorStops.map((st, idx) => {
-                    const stepThreshold = (idx / Math.max(1, activeCorridorStops.length - 1)) * 100;
-                    const isPassed = trackingProgress >= stepThreshold;
-                    return (
-                      <div key={st.name + idx} className="activity-feed-item">
-                        <div className={`activity-bullet ${isPassed ? 'passed' : ''}`}></div>
-                        <div>
-                          <div style={{ fontWeight: 700 }}>
-                            {idx === 0 ? `Departure: ${st.name}` : `Stop ${idx}: ${st.name}`}
-                            {st.etaTime && <span style={{ fontSize: '0.75rem', color: '#D82C36', marginLeft: '6px' }}>({st.etaTime})</span>}
-                          </div>
-                          <div style={{ fontSize: '0.72rem', color: '#64748B' }}>
-                            {idx === 0
-                              ? `Shuttle departed at ${activeTrackingSlot?.time || ''} from campus gate.`
-                              : isPassed
-                              ? `Completed waypoint at ${st.landmark}.`
-                              : `Scheduled stop en route to ${activeTrackingSlot?.destination}.`}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
               </div>
             </div>
           </div>

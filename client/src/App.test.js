@@ -8,9 +8,8 @@ describe('JKLU Campus Shuttle App', () => {
     expect(headingElements.length).toBeGreaterThan(0);
   });
 
-  test('renders the 3 official campus stops in the hero and route', () => {
+  test('renders official campus transit destinations in routes', () => {
     render(<App />);
-    expect(screen.getAllByText(/200 Feet Bypass/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Elements Mall/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Mansarovar Metro Station/i).length).toBeGreaterThan(0);
   });

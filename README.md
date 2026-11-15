@@ -32,20 +32,21 @@ The shuttle operates directly from **JKLU Campus (Main Gate 1, near Saraswati St
 
 ### 2. 📡 Real-Time Live Bus GPS Tracking
 - **Immediate Post-Booking Launch**: Instant high-visibility button right after receiving your Boarding Pass to track your specific bus live.
-- **Interactive Corridor Road**: Animated shuttle bus marker progressing in real-time along the Ajmer Road Highway across all 4 waypoints (*JKLU Gate 1 ➔ 200 Feet Bypass ➔ Elements Mall ➔ Mansarovar Metro*).
-- **Live Telemetry & Dashboard**: Real-time speedometer gauge (e.g. 42 km/h), Next Stop countdown, distance covered/remaining, and highway traffic status.
-- **Driver Profile & Direct Contact**: Displays driver name, campus ID, experience, vehicle plate number, and 1-tap direct phone call button.
-- **Milestone Activity Feed**: Chronological log of departures, toll crossings, and stop arrivals.
+- **Interactive Corridor Road**: Animated shuttle bus marker progressing in real-time along the Ajmer Road Highway across official corridor waypoints (*JKLU Gate 1 ➔ 200 Feet Bypass ➔ Elements Mall ➔ Mansarovar Metro*).
+- **Live Telemetry**: Real-time Next Stop spotlight, ETA countdown, and distance remaining to destination.
+- **Driver Profile & Direct Contact**: Displays driver name, campus ID, vehicle plate number, route departure time, and 1-tap direct phone call button.
 
 ### 3. 🚌 RedBus Operational Efficiency
 - **Interactive Coach Blueprint**: Authentic 2x2 bus seating layout featuring driver cabin, door entrance, center aisle, window/aisle designations, and live seat occupancy status.
 - **Seat States**: Real-time visualization of Available (clean white), Selected (vibrant crimson), and Booked/Occupied (locked slate).
 - **Seat Availability Counter**: Immediate feedback on seats remaining for every departure time.
-- **Direction & Schedule Filters**: Instant filtering by shift (Morning, Afternoon, Evening, Night) and direction.
+- **Direction & Schedule Filters**: Instant filtering by shift (Morning, Afternoon, Evening) and direction (JKLU ➔ City Stops / City ➔ JKLU Campus).
+- **Streamlined Booking Steps**: Step-by-step RedBus stepper navigation connecting shuttle selection, stop selection, seat selection, passenger details, and boarding pass.
 
-### 4. 🍏 Apple Minimalism
+### 4. 🍏 Apple Minimalism & Design
+- **Official Brand Favicon & Identity**: Custom vector and multi-resolution JKLU Shuttle bus badge matching the app's signature brand styling across browser tabs and devices.
 - **Frosted Glass Navigation**: Sticky glass header with live campus operations indicator.
-- **Segmented Control Tabs**: Seamless switching between **Book Shuttle**, **My Passes**, **Live Bus GPS**, **3 Stops Route Explorer**, and **Timetable**.
+- **Segmented Control Tabs**: Seamless switching between **Book Shuttle**, **My Passes**, **Live Bus GPS**, and **Timetable**.
 - **Apple Wallet-Style Digital Boarding Pass**:
   - Perforated ticket styling with circular notch cutouts.
   - Verification badge and dynamic SVG QR Code for conductor scanning.
