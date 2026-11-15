@@ -141,3 +141,24 @@ export const runsOn = (slot, date) => {
   const createdDate = slot?.routeName ? null : createdDateOf(slot);
   return !createdDate || date >= createdDate;
 };
+
+// Checks whether a shuttle's scheduled departure time has already passed for today
+export const isTripDeparted = (slot, date) => {
+  if (!slot?.time) return false;
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const localToday = `${year}-${month}-${day}`;
+  const isoToday = now.toISOString().split('T')[0];
+
+  // Shuttle time can only be expired if date is today
+  if (date !== localToday && date !== isoToday) {
+    return false;
+  }
+
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const slotMinutes = minutesOf(slot.time);
+  return slotMinutes <= currentMinutes;
+};
+

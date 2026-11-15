@@ -40,8 +40,16 @@ import {
   tripEnds,
   runsOn,
   minutesOf,
-  weekdayOf
+  weekdayOf,
+  isTripDeparted
 } from './data/trips';
+import {
+  bookingStepList,
+  STEP_SELECT_SHUTTLE,
+  STEP_CHOOSE_STOP,
+  STEP_SEAT_SELECTION,
+  STEP_BOARDING_PASS
+} from './utils/bookingStepsLinkedList';
 import './App.css';
 import './Admin.css';
 import './Trips.css';
@@ -470,24 +478,45 @@ const App = () => {
     setBookedSeats(combined);
   }, [myTrips]);
 
-  // Handle slot selection
+  // Handle slot selection (Node 1 in the Linked List)
   const handleSelectSlot = (slot) => {
     if (slotCancellation(slot, selectedDate)) return;
+    if (isTripDeparted(slot, selectedDate)) {
+      setBookingError('This shuttle departure time has already passed for today. Please select an upcoming shuttle time.');
+      return;
+    }
     setBookingError('');
     setSelectedSlot(slot);
     setSelectedSeat(null);
     // Preselect the usual stop: the first pickup coming in, the final stop going out
     const stops = stopsOf(slot);
-    setSelectedStop((isInbound(slot) ? stops[0] : stops[stops.length - 1]) || '');
+    const initialStop = (isInbound(slot) ? stops[0] : stops[stops.length - 1]) || '';
+    setSelectedStop(initialStop);
     fetchBookedSeats(slot._id, selectedDate);
-    setStep(2);
+    setTrackingBus(slot.busNumber || 'RJ 14 PA 2024');
+
+    // Advance via linked list: transition from STEP_SELECT_SHUTTLE to next node (STEP_CHOOSE_STOP)
+    const nextStepId = bookingStepList.getNextStep(STEP_SELECT_SHUTTLE, {
+      selectedSlot: slot,
+      selectedStop: initialStop,
+      selectedSeat: null,
+      confirmedPass
+    });
+    setStep(nextStepId);
     window.scrollTo({ top: 120, behavior: 'smooth' });
   };
 
-  // Handle stop selection
+  // Handle stop selection (Node 2 in the Linked List)
   const handleSelectStop = (stopName) => {
     setSelectedStop(stopName);
-    setStep(3);
+    // Advance via linked list: transition from STEP_CHOOSE_STOP to next node (STEP_SEAT_SELECTION)
+    const nextStepId = bookingStepList.getNextStep(STEP_CHOOSE_STOP, {
+      selectedSlot,
+      selectedStop: stopName,
+      selectedSeat,
+      confirmedPass
+    });
+    setStep(nextStepId);
     window.scrollTo({ top: 120, behavior: 'smooth' });
   };
 
@@ -704,49 +733,93 @@ const App = () => {
       .sort((a, b) => minutesOf(a.time) - minutesOf(b.time));
   }, [slots, selectedPeriod, selectedDate, directionFilter]);
 
+  // Booking state object for linked list navigation checks
+  const bookingState = useMemo(() => ({
+    selectedSlot,
+    selectedStop,
+    selectedSeat,
+    confirmedPass,
+    directionFilter
+  }), [selectedSlot, selectedStop, selectedSeat, confirmedPass, directionFilter]);
+
+  // Synchronize shuttle details when selectedDate or slots update
+  useEffect(() => {
+    if (selectedSlot) {
+      if (isTripDeparted(selectedSlot, selectedDate) || !runsOn(selectedSlot, selectedDate)) {
+        // Today's departure time has passed or shuttle doesn't run on this date: clear selection and reset to Step 1
+        setSelectedSlot(null);
+        setSelectedStop('');
+        setSelectedSeat(null);
+        setStep(STEP_SELECT_SHUTTLE);
+      } else {
+        // Ensure selectedStop is still valid for this shuttle
+        const validStops = stopsOf(selectedSlot);
+        if (selectedStop && !validStops.includes(selectedStop)) {
+          const defaultStop = (isInbound(selectedSlot) ? validStops[0] : validStops[validStops.length - 1]) || '';
+          setSelectedStop(defaultStop);
+        }
+        fetchBookedSeats(selectedSlot._id, selectedDate);
+      }
+    }
+  }, [selectedDate, selectedSlot, selectedStop, fetchBookedSeats]);
+
   // Where the selected booking starts and ends
   const selectedTripEnds = selectedSlot ? tripEnds(selectedSlot, selectedStop) : { from: '', to: '' };
 
-  // Active driver for live tracking
-  const currentDriver = BUS_DRIVERS[trackingBus] || BUS_DRIVERS['RJ 14 PA 2024'];
+  // Active tracked shuttle slot for Live Bus GPS (synchronized with selectedSlot, confirmedPass, or schedule)
+  const activeTrackingSlot = useMemo(() => {
+    if (trackingTrip?.slot) return trackingTrip.slot;
+    if (selectedSlot) return selectedSlot;
+    const confirmedTrip = myTrips.find(t => t.status === 'Confirmed');
+    if (confirmedTrip?.slot) return confirmedTrip.slot;
+    return filteredSlots.find(s => !isTripDeparted(s, selectedDate)) || slots[0] || INITIAL_SLOTS[0];
+  }, [trackingTrip, selectedSlot, myTrips, filteredSlots, selectedDate, slots]);
 
-  // Calculate live tracking waypoint stages along the 19.5 km corridor
-  // Progress: 0% = Gate 1, 30% = 200 Feet Bypass, 65% = Elements Mall, 100% = Mansarovar Metro
+  const activeTrackingBus = activeTrackingSlot?.busNumber || trackingBus;
+  const activeDriver = BUS_DRIVERS[activeTrackingBus] || BUS_DRIVERS['RJ 14 PA 2024'];
+
+  // Dynamically derive corridor stops from active tracked shuttle
+  const activeCorridorStops = useMemo(() => {
+    if (!activeTrackingSlot) return JKLU_STOPS;
+    const origin = activeTrackingSlot.origin || CAMPUS;
+    const dest = activeTrackingSlot.destination || 'Mansarovar Metro Station';
+    const midStops = stopsOf(activeTrackingSlot);
+    const stopsList = [
+      { name: origin, landmark: 'Origin Departure Point', distance: '0 km', isOrigin: true }
+    ];
+    midStops.forEach((sName, i) => {
+      const match = JKLU_STOPS.find(j => j.name.toLowerCase() === sName.toLowerCase());
+      const eta = stopTime(activeTrackingSlot, sName);
+      stopsList.push({
+        name: sName,
+        landmark: match ? match.landmark : (sName === dest ? 'Terminal Connection' : 'Designated Stop'),
+        distance: match ? `${match.distanceKm} km` : `Stop ${i + 1}`,
+        etaTime: eta
+      });
+    });
+    return stopsList;
+  }, [activeTrackingSlot]);
+
+  // Synchronized live tracking waypoint stages
   const liveStageInfo = useMemo(() => {
-    if (trackingProgress < 28) {
-      return {
-        stageIndex: 0,
-        currentMilestone: 'Departed JKLU Gate 1, navigating Mahapura Expressway',
-        nextStop: '200 Feet Bypass',
-        etaNextMinutes: Math.max(1, Math.round(15 * (1 - trackingProgress / 28))),
-        passedStops: ['JKLU Campus (Gate 1)']
-      };
-    } else if (trackingProgress < 65) {
-      return {
-        stageIndex: 1,
-        currentMilestone: 'Crossed 200 Feet Bypass flyover, cruising on Ajmer Road',
-        nextStop: 'Elements Mall',
-        etaNextMinutes: Math.max(1, Math.round(10 * (1 - (trackingProgress - 28) / 37))),
-        passedStops: ['JKLU Campus (Gate 1)', '200 feet bypass']
-      };
-    } else if (trackingProgress < 94) {
-      return {
-        stageIndex: 2,
-        currentMilestone: 'Approaching DCM & Elements Mall connection',
-        nextStop: 'Mansarovar Metro Station',
-        etaNextMinutes: Math.max(1, Math.round(10 * (1 - (trackingProgress - 65) / 29))),
-        passedStops: ['JKLU Campus (Gate 1)', '200 feet bypass', 'Elements Mall']
-      };
-    } else {
-      return {
-        stageIndex: 3,
-        currentMilestone: 'Arrived at Mansarovar Metro Station terminal drop',
-        nextStop: 'Terminal Station (Arrived)',
-        etaNextMinutes: 0,
-        passedStops: ['JKLU Campus (Gate 1)', '200 feet bypass', 'Elements Mall', 'mansarovar metro station']
-      };
-    }
-  }, [trackingProgress]);
+    const stops = activeCorridorStops;
+    const numStops = Math.max(1, stops.length - 1);
+    const segment = 100 / numStops;
+    const currentIdx = Math.min(numStops - 1, Math.floor(trackingProgress / segment));
+    const nextStopItem = stops[Math.min(stops.length - 1, currentIdx + 1)] || stops[stops.length - 1];
+    const progressInSegment = (trackingProgress - currentIdx * segment) / segment;
+    const nextEtaMinutes = Math.max(1, Math.round(15 * (1 - progressInSegment)));
+
+    return {
+      stageIndex: currentIdx,
+      currentMilestone: currentIdx === 0
+        ? `Departed ${stops[0].name}, navigating transit corridor`
+        : `Departed ${stops[currentIdx].name}, en route to ${nextStopItem.name}`,
+      nextStop: trackingProgress >= 95 ? `${stops[stops.length - 1].name} (Arrived)` : nextStopItem.name,
+      etaNextMinutes: trackingProgress >= 95 ? 0 : nextEtaMinutes,
+      passedStops: stops.slice(0, currentIdx + 1).map(s => s.name)
+    };
+  }, [trackingProgress, activeCorridorStops]);
 
   // Render QR Code SVG
   const renderQRCode = (code) => (
@@ -830,13 +903,6 @@ const App = () => {
               Live Bus GPS
             </button>
             <button
-              className={`segmented-nav-btn ${currentTab === 'route' ? 'active' : ''}`}
-              onClick={() => setCurrentTab('route')}
-            >
-              <Compass size={15} />
-              3 Stops Route
-            </button>
-            <button
               className={`segmented-nav-btn ${currentTab === 'timetable' ? 'active' : ''}`}
               onClick={() => setCurrentTab('timetable')}
             >
@@ -845,7 +911,7 @@ const App = () => {
             </button>
           </nav>
 
-          {/* User Account / Remember Me Badge & Operations Status */}
+          {/* User Account / Remember Me Badge */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             {currentUser ? (
               <div className="user-profile-badge" onClick={() => setShowAuthModal(true)} title="JKLU University Profile">
@@ -870,12 +936,6 @@ const App = () => {
                 <span>Sign In (@jklu.edu.in)</span>
               </button>
             )}
-
-            {/* Operations Pill */}
-            <div className="status-pill">
-              <span className="status-dot"></span>
-              <span>{isServerOnline ? 'JKLU API Synced' : 'Gate 1 Active • Express Ready'}</span>
-            </div>
           </div>
         </div>
       </header>
@@ -943,55 +1003,59 @@ const App = () => {
               </div>
             </div>
 
-            {/* RedBus Stepper Bar */}
+            {/* RedBus Stepper Bar - Connected via Doubly Linked List */}
             <div className="stepper-container">
-              <div
-                className={`step-item ${step === 1 ? 'active' : step > 1 ? 'completed' : ''}`}
-                onClick={() => setStep(1)}
-              >
-                <div className="step-bubble">1</div>
-                <div className="step-meta">
-                  <h4>Select Shuttle</h4>
-                  <p>Time & Route</p>
-                </div>
-              </div>
+              {bookingStepList.toArray().map((stepNode) => {
+                const isActive = step === stepNode.id;
+                const isCompleted = bookingStepList.isStepCompleted(stepNode.id, bookingState);
+                const canAccess = bookingStepList.canNavigateTo(stepNode.id, bookingState);
 
-              <div className="step-connector"></div>
+                const handleStepClick = () => {
+                  if (isActive) return;
+                  if (canAccess) {
+                    setStep(stepNode.id);
+                    setBookingError('');
+                  } else {
+                    if (stepNode.id === STEP_CHOOSE_STOP && !selectedSlot) {
+                      setBookingError('Please select a shuttle first before choosing a stop.');
+                    } else if (stepNode.id === STEP_SEAT_SELECTION && !selectedStop) {
+                      setBookingError('Please select a stop first before choosing your seat.');
+                    }
+                  }
+                };
 
-              <div
-                className={`step-item ${step === 2 ? 'active' : step > 2 ? 'completed' : ''}`}
-                onClick={() => selectedSlot && setStep(2)}
-              >
-                <div className="step-bubble">2</div>
-                <div className="step-meta">
-                  <h4>Choose Stop</h4>
-                  <p>{directionFilter === 'inbound' ? 'Where you board' : 'Where you get off'}</p>
-                </div>
-              </div>
-
-              <div className="step-connector"></div>
-
-              <div
-                className={`step-item ${step === 3 ? 'active' : step > 3 ? 'completed' : ''}`}
-                onClick={() => selectedSlot && selectedStop && setStep(3)}
-              >
-                <div className="step-bubble">3</div>
-                <div className="step-meta">
-                  <h4>Seat Selection</h4>
-                  <p>Coach Blueprint</p>
-                </div>
-              </div>
-
-              <div className="step-connector"></div>
-
-              <div className={`step-item ${step === 4 ? 'active' : ''}`}>
-                <div className="step-bubble">4</div>
-                <div className="step-meta">
-                  <h4>Boarding Pass</h4>
-                  <p>Digital QR Ticket</p>
-                </div>
-              </div>
+                return (
+                  <React.Fragment key={stepNode.id}>
+                    {stepNode.prev && (
+                      <div className={`step-connector ${isCompleted || isActive ? 'completed' : ''}`}></div>
+                    )}
+                    <div
+                      className={`step-item ${isActive ? 'active' : isCompleted ? 'completed' : ''} ${!canAccess ? 'step-locked' : ''}`}
+                      onClick={handleStepClick}
+                      style={{ cursor: canAccess ? 'pointer' : 'not-allowed', opacity: !canAccess && !isActive ? 0.45 : 1 }}
+                      title={!canAccess ? `Complete previous step to unlock ${stepNode.title}` : stepNode.title}
+                    >
+                      <div className="step-bubble">{stepNode.id}</div>
+                      <div className="step-meta">
+                        <h4>{stepNode.title}</h4>
+                        <p>
+                          {stepNode.id === STEP_CHOOSE_STOP
+                            ? (directionFilter === 'inbound' ? 'Where you board' : 'Where you get off')
+                            : stepNode.subtitle}
+                        </p>
+                      </div>
+                    </div>
+                  </React.Fragment>
+                );
+              })}
             </div>
+
+            {bookingError && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', background: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: '10px', color: '#991B1B', fontSize: '0.85rem', marginBottom: '16px' }}>
+                <AlertTriangle size={16} />
+                <span>{bookingError}</span>
+              </div>
+            )}
 
             {/* STEP 1: SELECT SHUTTLE TIME */}
             {step === 1 && (
@@ -1060,13 +1124,18 @@ const App = () => {
                   {filteredSlots.map(slot => {
                     const availableCount = slot.totalSeats - 6;
                     const cancellation = slotCancellation(slot, selectedDate);
+                    const isDeparted = isTripDeparted(slot, selectedDate);
                     const inbound = isInbound(slot);
                     const routeStops = inbound
                       ? [...stopsOf(slot), 'JKLU Campus']
                       : ['JKLU Campus', ...stopsOf(slot)];
                     const arrives = arrivalTime(slot);
                     return (
-                      <div key={slot._id} className={`shuttle-card ${cancellation ? 'shuttle-card-cancelled' : ''}`}>
+                      <div
+                        key={slot._id}
+                        className={`shuttle-card ${cancellation ? 'shuttle-card-cancelled' : ''} ${isDeparted ? 'shuttle-card-departed' : ''}`}
+                        style={isDeparted ? { opacity: 0.75, borderStyle: 'dashed' } : undefined}
+                      >
                         <div className="shuttle-time-col">
                           <div className="shuttle-dep-time">{slot.time}</div>
                           <span className="shuttle-period-pill">{slot.period}</span>
@@ -1114,6 +1183,19 @@ const App = () => {
                               <span>Not available</span>
                             </button>
                           </div>
+                        ) : isDeparted ? (
+                          <div className="shuttle-action-col">
+                            <div className="shuttle-cancelled-badge" style={{ background: '#F1F5F9', color: '#64748B', borderColor: '#CBD5E1' }}>Time Passed</div>
+                            <div className="shuttle-cancelled-reason" style={{ color: '#94A3B8' }}>Shuttle departed for today</div>
+                            <button
+                              className="select-shuttle-btn"
+                              disabled
+                              aria-disabled="true"
+                              style={{ background: '#E2E8F0', color: '#94A3B8', cursor: 'not-allowed', borderColor: '#CBD5E1' }}
+                            >
+                              <span>Departed</span>
+                            </button>
+                          </div>
                         ) : (
                           <div className="shuttle-action-col">
                             <div className="seats-counter-badge available">
@@ -1154,7 +1236,7 @@ const App = () => {
                     </p>
                   </div>
                   <button
-                    onClick={() => setStep(1)}
+                    onClick={() => setStep(bookingStepList.getPrevStep(STEP_CHOOSE_STOP))}
                     style={{ background: 'none', border: 'none', color: '#64748B', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem', fontWeight: 600 }}
                   >
                     <ArrowLeft size={16} /> Change Shuttle Time
@@ -1211,7 +1293,14 @@ const App = () => {
                 <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end' }}>
                   <button
                     className="select-shuttle-btn"
-                    onClick={() => setStep(3)}
+                    onClick={() => {
+                      if (!selectedStop) {
+                        setBookingError('Please choose a stop before proceeding to seat selection.');
+                        return;
+                      }
+                      const nextStepId = bookingStepList.getNextStep(STEP_CHOOSE_STOP, bookingState);
+                      setStep(nextStepId);
+                    }}
                     style={{ padding: '12px 28px', fontSize: '0.9rem' }}
                   >
                     <span>Proceed to Seat Selection</span>
@@ -1232,7 +1321,7 @@ const App = () => {
                     </p>
                   </div>
                   <button
-                    onClick={() => setStep(2)}
+                    onClick={() => setStep(bookingStepList.getPrevStep(STEP_SEAT_SELECTION))}
                     style={{ background: 'none', border: 'none', color: '#64748B', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem', fontWeight: 600 }}
                   >
                     <ArrowLeft size={16} /> Change Stop
@@ -1630,27 +1719,64 @@ const App = () => {
               <div className="tracking-title-wrap">
                 <h3>
                   <Bus size={24} color="#D82C36" />
-                  <span>Live GPS Tracking: {trackingBus}</span>
+                  <span>Bus: {activeTrackingBus}</span>
                 </h3>
                 <p style={{ fontSize: '0.8rem', color: '#94A3B8', marginTop: '4px' }}>
-                  Real-time satellite GPS tracking from JKLU Campus along Ajmer Road Transit Corridor
+                  {activeTrackingSlot?.routeName || 'Transit Route'} • Scheduled Departure: {activeTrackingSlot?.time} • {activeTrackingSlot?.origin || CAMPUS} ➔ {activeTrackingSlot?.destination || 'Destination'}
                 </p>
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div className="tracking-radar-tag">
-                  <span className="radar-ping-dot"></span>
-                  <span>GPS Active • Ping {trackingLastPing}</span>
-                </div>
-
                 {trackingTrip && (
                   <button
-                    onClick={() => { setCurrentTab('book'); setStep(4); }}
+                    onClick={() => { setCurrentTab('book'); setStep(STEP_BOARDING_PASS); }}
                     className="sim-action-btn"
                   >
                     <Ticket size={14} /> Back to Pass
                   </button>
                 )}
+              </div>
+            </div>
+
+            {/* Shuttle Synchronization & Quick Switch Bar */}
+            <div className="shuttle-sync-bar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '10px 16px', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Bus size={18} color="#D82C36" />
+                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0F172A' }}>Synchronized Shuttle:</span>
+                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#D82C36' }}>
+                  {activeTrackingSlot?.routeName || 'Route'} ({activeTrackingSlot?.time} Departure)
+                </span>
+                <span style={{ fontSize: '0.78rem', color: '#64748B', background: '#FFF', border: '1px solid #CBD5E1', padding: '2px 8px', borderRadius: '4px' }}>
+                  {activeTrackingBus}
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600 }}>Track Other Shuttle:</span>
+                {slots.slice(0, 4).map((s) => {
+                  const isSel = activeTrackingSlot?._id === s._id;
+                  return (
+                    <button
+                      key={s._id}
+                      onClick={() => {
+                        setSelectedSlot(s);
+                        setTrackingBus(s.busNumber || 'RJ 14 PA 2024');
+                        setTrackingTrip(null);
+                      }}
+                      style={{
+                        border: isSel ? '1.5px solid #D82C36' : '1px solid #CBD5E1',
+                        background: isSel ? '#FEE2E2' : '#FFF',
+                        color: isSel ? '#991B1B' : '#475569',
+                        borderRadius: '6px',
+                        padding: '4px 8px',
+                        fontSize: '0.75rem',
+                        fontWeight: isSel ? 700 : 500,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {s.routeName} ({s.time})
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -1666,19 +1792,22 @@ const App = () => {
                   <div style={{ fontSize: '0.78rem', color: '#64748B', marginTop: '2px' }}>
                     {liveStageInfo.currentMilestone}
                   </div>
+                  <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '4px' }}>
+                    Route: <strong>{activeTrackingSlot?.routeName || 'Route 1'}</strong> ({activeTrackingSlot?.origin || CAMPUS} ➔ {activeTrackingSlot?.destination}) • Departure: <strong>{activeTrackingSlot?.time}</strong>
+                  </div>
                 </div>
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                {trackingTrip?.stop && (
+                {(selectedStop || trackingTrip?.stop) && (
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '0.7rem', color: '#94A3B8', textTransform: 'uppercase', fontWeight: 700 }}>Your Drop Stop</div>
-                    <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#D82C36' }}>{trackingTrip.stop}</div>
+                    <div style={{ fontSize: '0.7rem', color: '#94A3B8', textTransform: 'uppercase', fontWeight: 700 }}>Your Chosen Stop</div>
+                    <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#D82C36' }}>{selectedStop || trackingTrip?.stop}</div>
                   </div>
                 )}
                 <div className="spotlight-countdown">
                   <Clock size={16} />
-                  <span>ETA ~{liveStageInfo.etaNextMinutes} min</span>
+                  <span>Approximate Travel Time: ~{liveStageInfo.etaNextMinutes} min</span>
                 </div>
               </div>
             </div>
@@ -1687,7 +1816,7 @@ const App = () => {
             <div className="corridor-map-wrapper">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                 <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: '#64748B', letterSpacing: '0.08em' }}>
-                  Transit Corridor Map (Ajmer Road Highway)
+                  Transit Corridor Map ({activeTrackingSlot?.routeName || 'Highway Corridor'})
                 </span>
                 <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#D82C36' }}>
                   {Math.round(trackingProgress)}% Route Completed
@@ -1708,106 +1837,47 @@ const App = () => {
                   className="corridor-bus-marker"
                   style={{ left: `${Math.min(96, Math.max(4, trackingProgress))}%` }}
                 >
-                  <div className="bus-marker-bubble" title={`${trackingBus} - ${trackingSpeed} km/h`}>
+                  <div className="bus-marker-bubble" title={activeTrackingBus}>
                     <Bus size={20} />
                   </div>
                   <div className="bus-live-tooltip">
-                    {trackingBus} • {trackingSpeed} km/h
+                    {activeTrackingBus}
                   </div>
                 </div>
 
-                {/* 4 Stations: Origin + 3 Designated Stops */}
+                {/* Corridor Stations dynamically synchronized with activeRoute */}
                 <div className="corridor-stops-row">
-                  {/* Origin */}
-                  <div className={`corridor-station-node ${trackingProgress > 4 ? 'completed' : 'active-stage'}`}>
-                    <div className="station-pin-dot">0</div>
-                    <div className="station-title">JKLU Campus</div>
-                    <div className="station-subtitle">Main Gate 1 (0 km)</div>
-                  </div>
-
-                  {/* Stop 1: 200 Feet Bypass */}
-                  <div className={`corridor-station-node ${trackingProgress >= 28 ? 'completed' : trackingProgress > 4 ? 'active-stage' : ''} ${trackingTrip?.stop === '200 feet bypass' ? 'user-destination' : ''}`}>
-                    <div className="station-pin-dot">1</div>
-                    <div className="station-title">200 Feet Bypass</div>
-                    <div className="station-subtitle">Heerapura (8.5 km)</div>
-                    {trackingTrip?.stop === '200 feet bypass' && (
-                      <span className="station-user-target-pill">Your Stop</span>
-                    )}
-                  </div>
-
-                  {/* Stop 2: Elements Mall */}
-                  <div className={`corridor-station-node ${trackingProgress >= 65 ? 'completed' : trackingProgress >= 28 ? 'active-stage' : ''} ${trackingTrip?.stop === 'Elements Mall' ? 'user-destination' : ''}`}>
-                    <div className="station-pin-dot">2</div>
-                    <div className="station-title">Elements Mall</div>
-                    <div className="station-subtitle">DCM Hub (14.0 km)</div>
-                    {trackingTrip?.stop === 'Elements Mall' && (
-                      <span className="station-user-target-pill">Your Stop</span>
-                    )}
-                  </div>
-
-                  {/* Stop 3: Mansarovar Metro Station */}
-                  <div className={`corridor-station-node ${trackingProgress >= 94 ? 'completed' : trackingProgress >= 65 ? 'active-stage' : ''} ${trackingTrip?.stop === 'mansarovar metro station' ? 'user-destination' : ''}`}>
-                    <div className="station-pin-dot">3</div>
-                    <div className="station-title">Mansarovar Metro</div>
-                    <div className="station-subtitle">Terminal (19.5 km)</div>
-                    {trackingTrip?.stop === 'mansarovar metro station' && (
-                      <span className="station-user-target-pill">Your Stop</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Simulation & GPS Refresh Controls */}
-              <div className="tracking-sim-controls">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: '#475569' }}>
-                  <ShieldCheck size={16} color="#10B981" />
-                  <span>Real-Time GPS Telemetry Stream</span>
-                </div>
-
-                <div className="sim-btn-group">
-                  <button
-                    className="sim-action-btn"
-                    onClick={() => setIsTrackingSimulating(!isTrackingSimulating)}
-                  >
-                    {isTrackingSimulating ? <Pause size={13} /> : <Play size={13} />}
-                    <span>{isTrackingSimulating ? 'Pause Movement' : 'Resume Simulation'}</span>
-                  </button>
-
-                  <button
-                    className="sim-action-btn"
-                    onClick={() => setTrackingProgress(prev => Math.min(95, prev + 25))}
-                  >
-                    <ArrowRight size={13} /> Advance Next Stop
-                  </button>
-
-                  <button
-                    className="sim-action-btn"
-                    onClick={() => { setTrackingProgress(8); setTrackingLastPing(new Date().toLocaleTimeString()); }}
-                  >
-                    <RefreshCw size={13} /> Reset to Gate 1
-                  </button>
+                  {activeCorridorStops.map((st, idx) => {
+                    const stepThreshold = (idx / Math.max(1, activeCorridorStops.length - 1)) * 100;
+                    const isCompleted = trackingProgress >= stepThreshold;
+                    const isUserStop = (selectedStop && selectedStop.toLowerCase() === st.name.toLowerCase()) ||
+                                      (trackingTrip?.stop && trackingTrip.stop.toLowerCase() === st.name.toLowerCase());
+                    return (
+                      <div
+                        key={st.name + idx}
+                        className={`corridor-station-node ${isCompleted ? 'completed' : 'active-stage'} ${isUserStop ? 'user-destination' : ''}`}
+                      >
+                        <div className="station-pin-dot">{idx}</div>
+                        <div className="station-title">{st.name}</div>
+                        <div className="station-subtitle">
+                          {st.isOrigin ? `${st.landmark} (0 km)` : st.etaTime ? `${st.etaTime} (${st.distance})` : st.distance}
+                        </div>
+                        {isUserStop && (
+                          <span className="station-user-target-pill">Your Stop</span>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
 
-            {/* Telemetry Dashboard Stats */}
-            <div className="telemetry-dashboard-grid">
-              <div className="telemetry-card">
-                <div className="telemetry-label">Live Speed</div>
-                <div className="telemetry-val" style={{ color: '#D82C36' }}>{trackingSpeed} km/h</div>
-                <div className="telemetry-sub">Cruise Speed on Highway</div>
-              </div>
-
-              <div className="telemetry-card">
-                <div className="telemetry-label">Distance Covered</div>
-                <div className="telemetry-val">{(19.5 * (trackingProgress / 100)).toFixed(1)} km</div>
-                <div className="telemetry-sub">of 19.5 km Total Route</div>
-              </div>
-
+            {/* Telemetry Dashboard Stats - Live Speed and Distance Covered removed per user request */}
+            <div className="telemetry-dashboard-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
               <div className="telemetry-card">
                 <div className="telemetry-label">Distance Remaining</div>
                 <div className="telemetry-val">{(19.5 * (1 - trackingProgress / 100)).toFixed(1)} km</div>
-                <div className="telemetry-sub">to Mansarovar Metro</div>
+                <div className="telemetry-sub">to {activeTrackingSlot?.destination || 'Destination'}</div>
               </div>
 
               <div className="telemetry-card">
@@ -1819,35 +1889,31 @@ const App = () => {
 
             {/* Bottom Section: Driver Profile & Live Activity Feed */}
             <div className="tracking-bottom-section">
-              {/* Driver Details Card */}
+              {/* Driver Details Card - type, security status, and 9 yrs service removed */}
               <div className="driver-info-card">
                 <div className="driver-profile-header">
                   <div className="driver-avatar">
-                    {currentDriver.name.charAt(0)}
+                    {activeDriver.name.charAt(0)}
                   </div>
                   <div>
-                    <h4 style={{ fontSize: '1rem', fontWeight: 800 }}>{currentDriver.name}</h4>
+                    <h4 style={{ fontSize: '1rem', fontWeight: 800 }}>{activeDriver.name}</h4>
                     <p style={{ fontSize: '0.72rem', color: '#64748B' }}>
-                      Official JKLU Driver • {currentDriver.id}
-                    </p>
-                    <p style={{ fontSize: '0.7rem', color: '#10B981', fontWeight: 700, marginTop: '2px' }}>
-                      ● {currentDriver.exp}
+                      Official JKLU Driver • {activeDriver.id}
                     </p>
                   </div>
                 </div>
 
                 <div style={{ fontSize: '0.78rem', color: '#475569', lineHeight: 1.5, background: '#fff', padding: '10px 12px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
-                  <div><strong>Vehicle Plate:</strong> {trackingBus}</div>
-                  <div><strong>Type:</strong> Executive AC Campus Express</div>
-                  <div><strong>Security Status:</strong> Gate 1 RFID Cleared</div>
+                  <div><strong>Vehicle Plate:</strong> {activeTrackingBus}</div>
+                  <div><strong>Route:</strong> {activeTrackingSlot?.routeName || 'Route 1'} • {activeTrackingSlot?.time || ''} Departure</div>
                 </div>
 
                 <a
-                  href={`tel:${currentDriver.phone.replace(/\s+/g, '')}`}
+                  href={`tel:${activeDriver.phone.replace(/\s+/g, '')}`}
                   className="driver-contact-btn"
                 >
                   <Phone size={14} />
-                  <span>Call Shuttle Driver ({currentDriver.phone})</span>
+                  <span>Call Shuttle Driver ({activeDriver.phone})</span>
                 </a>
               </div>
 
@@ -1859,51 +1925,34 @@ const App = () => {
                 </div>
 
                 <div className="activity-feed-list">
-                  <div className="activity-feed-item">
-                    <div className="activity-bullet passed"></div>
-                    <div>
-                      <div style={{ fontWeight: 700 }}>Gate 1 Departure (JKLU Campus)</div>
-                      <div style={{ fontSize: '0.72rem', color: '#64748B' }}>Shuttle boarded students and cleared campus gate security.</div>
-                    </div>
-                  </div>
-
-                  <div className="activity-feed-item">
-                    <div className={`activity-bullet ${trackingProgress >= 28 ? 'passed' : ''}`}></div>
-                    <div>
-                      <div style={{ fontWeight: 700 }}>Stop 1: 200 Feet Bypass (Heerapura)</div>
-                      <div style={{ fontSize: '0.72rem', color: '#64748B' }}>
-                        {trackingProgress >= 28 ? 'Crossed flyover and discharged designated passengers.' : 'Upcoming milestone (~8.5 km mark).'}
+                  {activeCorridorStops.map((st, idx) => {
+                    const stepThreshold = (idx / Math.max(1, activeCorridorStops.length - 1)) * 100;
+                    const isPassed = trackingProgress >= stepThreshold;
+                    return (
+                      <div key={st.name + idx} className="activity-feed-item">
+                        <div className={`activity-bullet ${isPassed ? 'passed' : ''}`}></div>
+                        <div>
+                          <div style={{ fontWeight: 700 }}>
+                            {idx === 0 ? `Departure: ${st.name}` : `Stop ${idx}: ${st.name}`}
+                            {st.etaTime && <span style={{ fontSize: '0.75rem', color: '#D82C36', marginLeft: '6px' }}>({st.etaTime})</span>}
+                          </div>
+                          <div style={{ fontSize: '0.72rem', color: '#64748B' }}>
+                            {idx === 0
+                              ? `Shuttle departed at ${activeTrackingSlot?.time || ''} from campus gate.`
+                              : isPassed
+                              ? `Completed waypoint at ${st.landmark}.`
+                              : `Scheduled stop en route to ${activeTrackingSlot?.destination}.`}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-
-                  <div className="activity-feed-item">
-                    <div className={`activity-bullet ${trackingProgress >= 65 ? 'passed' : ''}`}></div>
-                    <div>
-                      <div style={{ fontWeight: 700 }}>Stop 2: Elements Mall (DCM Ajmer Road)</div>
-                      <div style={{ fontSize: '0.72rem', color: '#64748B' }}>
-                        {trackingProgress >= 65 ? 'Completed stop at DCM service lane.' : 'Next designated drop point.'}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="activity-feed-item">
-                    <div className={`activity-bullet ${trackingProgress >= 94 ? 'passed' : ''}`}></div>
-                    <div>
-                      <div style={{ fontWeight: 700 }}>Stop 3: Mansarovar Metro Station Terminal</div>
-                      <div style={{ fontSize: '0.72rem', color: '#64748B' }}>
-                        {trackingProgress >= 94 ? 'Arrived at Jaipur Metro Gate 1 pillar.' : 'Final terminal stop with Pink Line metro connection.'}
-                      </div>
-                    </div>
-                  </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* ========================================================================= */}
-        {/* TAB 3: MY PASSES & TICKETS */}
         {/* ========================================================================= */}
         {currentTab === 'passes' && (
           <div>
@@ -2014,83 +2063,7 @@ const App = () => {
         )}
 
         {/* ========================================================================= */}
-        {/* TAB 4: THE 3 STOPS ROUTE EXPLORER */}
-        {/* ========================================================================= */}
-        {currentTab === 'route' && (
-          <div className="route-explorer-card">
-            <div>
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: '#D82C36', letterSpacing: '0.08em' }}>
-                TRANSIT CORRIDOR
-              </span>
-              <h2 style={{ fontSize: '1.45rem', fontWeight: 800, marginTop: '4px' }}>JKLU Campus ➔ City Transit Route</h2>
-              <p style={{ fontSize: '0.85rem', color: '#64748B', marginTop: '4px' }}>
-                Official shuttle path connecting JK Lakshmipat University directly to the 3 prime hubs in Jaipur.
-              </p>
-            </div>
-
-            <div className="route-timeline">
-              <div className="timeline-node">
-                <div className="timeline-dot origin">
-                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#0F172A' }}></div>
-                </div>
-                <div className="timeline-content">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <h4>Origin: JKLU Campus (Main Gate 1)</h4>
-                    <span style={{ fontSize: '0.7rem', fontWeight: 700, background: '#F1F5F9', padding: '2px 8px', borderRadius: '4px' }}>Starting Point</span>
-                  </div>
-                  <p>Near Saraswati Statue, Near Mahapura, Post-200 Feet Ajmer Road, Jaipur.</p>
-                </div>
-              </div>
-
-              <div className="timeline-node">
-                <div className="timeline-dot">
-                  <span style={{ fontSize: '10px', fontWeight: 800, color: '#D82C36' }}>1</span>
-                </div>
-                <div className="timeline-content">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <h4>Stop 1: 200 Feet Bypass</h4>
-                    <span style={{ fontSize: '0.7rem', fontWeight: 700, background: '#FEE2E2', color: '#991B1B', padding: '2px 8px', borderRadius: '4px' }}>~15 Mins (8.5 km)</span>
-                  </div>
-                  <p><strong>Landmark:</strong> Heerapura Flyover / Ring Road Crossing on Ajmer Expressway.</p>
-                  <p style={{ fontSize: '0.75rem', color: '#64748B' }}>Ideal for students residing in Vaishali Nagar West, Nirman Nagar, or taking Delhi/Ajmer bypass connectivity.</p>
-                </div>
-              </div>
-
-              <div className="timeline-node">
-                <div className="timeline-dot">
-                  <span style={{ fontSize: '10px', fontWeight: 800, color: '#D82C36' }}>2</span>
-                </div>
-                <div className="timeline-content">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <h4>Stop 2: Elements Mall</h4>
-                    <span style={{ fontSize: '0.7rem', fontWeight: 700, background: '#FEE2E2', color: '#991B1B', padding: '2px 8px', borderRadius: '4px' }}>~25 Mins (14.0 km)</span>
-                  </div>
-                  <p><strong>Landmark:</strong> Opposite DCM, Main Ajmer Road.</p>
-                  <p style={{ fontSize: '0.75rem', color: '#64748B' }}>Primary shopping, cafe, grocery, and entertainment hub. Direct connectivity to Shyam Nagar, Sodala, and Chitrakoot.</p>
-                </div>
-              </div>
-
-              <div className="timeline-node" style={{ marginBottom: 0 }}>
-                <div className="timeline-dot">
-                  <span style={{ fontSize: '10px', fontWeight: 800, color: '#D82C36' }}>3</span>
-                </div>
-                <div className="timeline-content">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <h4>Stop 3: Mansarovar Metro Station</h4>
-                    <span style={{ fontSize: '0.7rem', fontWeight: 700, background: '#ECFDF5', color: '#065F46', padding: '2px 8px', borderRadius: '4px' }}>Terminal Stop (~35 Mins)</span>
-                  </div>
-                  <p><strong>Landmark:</strong> Gate No. 1 / Metro Pillar 24 (Jaipur Metro Pink Line).</p>
-                  <p style={{ fontSize: '0.75rem', color: '#64748B' }}>
-                    Terminal station with high-frequency Jaipur Metro trains every 7 minutes to Civil Lines, Railway Station, Sindhi Camp Bus Terminal, Chandpole, and Badi Chaupar.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ========================================================================= */}
-        {/* TAB 5: COMPLETE SHUTTLE TIMETABLE */}
+        {/* TAB 4: COMPLETE SHUTTLE TIMETABLE */}
         {/* ========================================================================= */}
         {currentTab === 'timetable' && (
           <div className="tt-card">
