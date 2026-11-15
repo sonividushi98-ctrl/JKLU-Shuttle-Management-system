@@ -49,6 +49,7 @@ import {
   STEP_SEAT_SELECTION,
   STEP_BOARDING_PASS
 } from './utils/bookingStepsLinkedList';
+import { getSocket, joinScheduleRoom, leaveScheduleRoom } from './services/socket';
 import './App.css';
 import './Admin.css';
 import './Trips.css';
@@ -477,6 +478,80 @@ const App = () => {
     setBookedSeats(combined);
   }, [myTrips]);
 
+  // ==========================================
+  // REAL-TIME SEAT AVAILABILITY VIA SOCKET.IO
+  // ==========================================
+  useEffect(() => {
+    if (!selectedSlot?._id || !selectedDate) return;
+
+    const socket = getSocket();
+    const slotId = String(selectedSlot._id);
+    const date = String(selectedDate);
+
+    // Join schedule-specific room so updates only target students viewing this schedule
+    joinScheduleRoom(slotId, date);
+
+    // Broadcast handler: another student booked a seat
+    const handleSeatBooked = (data) => {
+      if (String(data.slotId) === slotId && String(data.date) === date) {
+        setBookedSeats((prev) => {
+          if (Array.isArray(data.bookedSeats)) {
+            return Array.from(new Set([...prev, ...data.bookedSeats]));
+          }
+          return prev.includes(data.seatNumber) ? prev : [...prev, data.seatNumber];
+        });
+
+        // Deselect seat if this student was currently selecting the newly-booked seat
+        setSelectedSeat((currentSeat) => {
+          if (currentSeat === data.seatNumber) {
+            setBookingError(`Seat #${data.seatNumber} was just booked by another student. Please pick another seat.`);
+            return null;
+          }
+          return currentSeat;
+        });
+      }
+    };
+
+    // Broadcast handler: a booking was cancelled and seat released
+    const handleSeatCancelled = (data) => {
+      if (String(data.slotId) === slotId && String(data.date) === date) {
+        setBookedSeats((prev) => {
+          if (Array.isArray(data.bookedSeats)) {
+            return data.bookedSeats;
+          }
+          return prev.filter((seat) => seat !== Number(data.seatNumber));
+        });
+      }
+    };
+
+    // Broadcast handler: admin cancelled this entire shuttle schedule
+    const handleScheduleCancelled = (data) => {
+      if (String(data.slotId) === slotId && String(data.date) === date) {
+        fetchSlots();
+        fetchBookedSeats(slotId, date);
+      }
+    };
+
+    // On reconnect: re-join room and pull latest seat availability from MongoDB source of truth
+    const handleReconnect = () => {
+      joinScheduleRoom(slotId, date);
+      fetchBookedSeats(slotId, date);
+    };
+
+    socket.on('seat-booked', handleSeatBooked);
+    socket.on('seat-cancelled', handleSeatCancelled);
+    socket.on('schedule-cancelled', handleScheduleCancelled);
+    socket.on('connect', handleReconnect);
+
+    return () => {
+      socket.off('seat-booked', handleSeatBooked);
+      socket.off('seat-cancelled', handleSeatCancelled);
+      socket.off('schedule-cancelled', handleScheduleCancelled);
+      socket.off('connect', handleReconnect);
+      leaveScheduleRoom(slotId, date);
+    };
+  }, [selectedSlot?._id, selectedDate, fetchBookedSeats, fetchSlots]);
+
   // Handle slot selection (Node 1 in the Linked List)
   const handleSelectSlot = (slot) => {
     if (slotCancellation(slot, selectedDate)) return;
@@ -605,20 +680,38 @@ const App = () => {
     window.scrollTo({ top: 80, behavior: 'smooth' });
   };
 
-  // Cancel booking
+  // Cancel booking with confirmation and eligibility checks
   const handleCancelBooking = async (tripId) => {
-    if (!window.confirm('Are you sure you want to cancel this shuttle seat booking?')) return;
-    try {
-      await axios.post(`${API_BASE}/cancel/${tripId}`, {}, { timeout: 2000 });
-    } catch {
-      // Offline fallback
+    const tripToCancel = myTrips.find(t => String(t._id) === String(tripId)) || (String(confirmedPass?._id) === String(tripId) ? confirmedPass : null);
+    if (tripToCancel?.status === 'Cancelled') {
+      alert('This booking has already been cancelled.');
+      return;
     }
-    setMyTrips(prev => prev.map(t => t._id === tripId ? { ...t, status: 'Cancelled' } : t));
-    if (confirmedPass?._id === tripId) {
+
+    if (!window.confirm('Are you sure you want to cancel this shuttle seat booking? This will make your seat available for other students.')) {
+      return;
+    }
+
+    try {
+      await axios.post(`${API_BASE}/cancel/${tripId}`, {}, { timeout: 3000 });
+    } catch (err) {
+      if (err.response?.data?.message) {
+        alert(err.response.data.message);
+      }
+      // Offline fallback still proceeds
+    }
+
+    setMyTrips(prev => prev.map(t => String(t._id) === String(tripId) ? { ...t, status: 'Cancelled' } : t));
+    if (confirmedPass && String(confirmedPass._id) === String(tripId)) {
       setConfirmedPass(prev => ({ ...prev, status: 'Cancelled' }));
     }
-    if (modalTrip?._id === tripId) {
+    if (modalTrip && String(modalTrip._id) === String(tripId)) {
       setModalTrip(prev => ({ ...prev, status: 'Cancelled' }));
+    }
+
+    // Release seat in current view if matching schedule
+    if (tripToCancel?.seatNumber) {
+      setBookedSeats(prev => prev.filter(s => s !== Number(tripToCancel.seatNumber)));
     }
   };
 
@@ -1516,13 +1609,17 @@ const App = () => {
             {/* STEP 4: APPLE WALLET / REDBUS DIGITAL BOARDING PASS WITH IMMEDIATE LIVE TRACKING */}
             {step === 4 && confirmedPass && (
               <div className="ticket-wrapper">
-                {isAdminCancelled(confirmedPass) ? (
+                {confirmedPass.status === 'Cancelled' ? (
                   <div style={{ textAlign: 'center', marginBottom: '20px' }}>
                     <div style={{ width: '48px', height: '48px', background: '#FEE2E2', borderRadius: '50%', color: '#D82C36', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px' }}>
                       <AlertTriangle size={26} />
                     </div>
-                    <h3 style={{ fontSize: '1.4rem', fontWeight: 800 }}>Shuttle Cancelled</h3>
-                    <p style={{ fontSize: '0.85rem', color: '#64748B' }}>The transport office cancelled this shuttle. Please book another one.</p>
+                    <h3 style={{ fontSize: '1.4rem', fontWeight: 800 }}>Booking Cancelled</h3>
+                    <p style={{ fontSize: '0.85rem', color: '#64748B' }}>
+                      {isAdminCancelled(confirmedPass)
+                        ? `Cancelled by transport office: ${confirmedPass.cancelReason}`
+                        : `Seat #${confirmedPass.seatNumber} has been released and is available again.`}
+                    </p>
                   </div>
                 ) : (
                   <div style={{ textAlign: 'center', marginBottom: '20px' }}>
@@ -1569,13 +1666,21 @@ const App = () => {
                       <h3>JKLU CAMPUS SHUTTLE</h3>
                       <p>BOARDING PASS • GATE 1</p>
                     </div>
-                    <div className="pass-status-pill">
+                    <div
+                      className="pass-status-pill"
+                      style={confirmedPass.status === 'Cancelled' ? { background: '#FEE2E2', color: '#991B1B' } : undefined}
+                    >
                       ● {confirmedPass.status || 'CONFIRMED'}
                     </div>
                   </div>
 
                   {isAdminCancelled(confirmedPass) && (
                     <div className="admin-cancel-tag admin-cancel-tag-pass">Cancelled by admin: {confirmedPass.cancelReason}</div>
+                  )}
+                  {confirmedPass.status === 'Cancelled' && !isAdminCancelled(confirmedPass) && (
+                    <div className="admin-cancel-tag admin-cancel-tag-pass" style={{ background: '#FEF2F2', color: '#991B1B', borderColor: '#FCA5A5' }}>
+                      Booking cancelled: Seat #{confirmedPass.seatNumber} has been released.
+                    </div>
                   )}
 
                   <div className="pass-body">
@@ -1675,6 +1780,28 @@ const App = () => {
                     <Ticket size={16} />
                     <span>View in My Passes</span>
                   </button>
+
+                  {/* Cancel Booking Button in confirmation details */}
+                  {confirmedPass.status === 'Confirmed' ? (
+                    <button
+                      className="btn-secondary btn-cancel-booking-pass"
+                      onClick={() => handleCancelBooking(confirmedPass._id)}
+                      style={{ borderColor: '#FCA5A5', color: '#DC2626', background: '#FEF2F2', fontWeight: 700 }}
+                    >
+                      <X size={16} />
+                      <span>Cancel Booking</span>
+                    </button>
+                  ) : (
+                    <button
+                      className="btn-secondary"
+                      disabled
+                      aria-disabled="true"
+                      style={{ opacity: 0.6, cursor: 'not-allowed', color: '#94A3B8', borderColor: '#CBD5E1' }}
+                    >
+                      <X size={16} />
+                      <span>Booking Cancelled</span>
+                    </button>
+                  )}
                 </div>
               </div>
             )}

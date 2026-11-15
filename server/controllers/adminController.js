@@ -4,6 +4,7 @@ const Slot = require('../models/Slot');
 const Booking = require('../models/Booking');
 const Route = require('../models/Route');
 const { memoryStore } = require('./bookingController');
+const { broadcastScheduleCancelled } = require('../socket');
 
 const isDbConnected = () => mongoose.connection.readyState === 1;
 
@@ -326,6 +327,9 @@ exports.cancelSlot = async (req, res) => {
         }
       });
     }
+
+    // Broadcast schedule cancellation to real-time clients in that schedule room
+    broadcastScheduleCancelled({ slotId, date, reason });
 
     return res.json({
       message: cancelledCount > 0

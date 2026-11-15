@@ -14,4 +14,11 @@ const bookingSchema = new mongoose.Schema({
   bookingCode: { type: String, default: () => 'JKLU-' + Math.floor(100000 + Math.random() * 900000) }
 }, { timestamps: true });
 
+// Compound unique index to strictly guarantee at the database engine level that
+// only ONE confirmed booking can ever exist for a given slot, date, and seat number.
+bookingSchema.index(
+  { slot: 1, date: 1, seatNumber: 1 },
+  { unique: true, partialFilterExpression: { status: 'Confirmed' } }
+);
+
 module.exports = mongoose.model('Booking', bookingSchema);

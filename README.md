@@ -36,14 +36,27 @@ The shuttle operates directly from **JKLU Campus (Main Gate 1, near Saraswati St
 - **Live Telemetry**: Real-time Next Stop spotlight, ETA countdown, and distance remaining to destination.
 - **Driver Profile & Direct Contact**: Displays driver name, campus ID, vehicle plate number, route departure time, and 1-tap direct phone call button.
 
-### 3. 🚌 RedBus Operational Efficiency
+### 3. ⚡ Real-Time Seat Availability (Socket.IO) & Instant Cancellation
+- **Schedule-Specific Socket Rooms**: Students viewing a specific shuttle schedule automatically join an isolated Socket.IO room (`schedule:${slotId}:${date}`). Real-time updates only target students viewing that exact shuttle time and date.
+- **Zero-Refresh Real-Time Sync**: When a student confirms a booking, a `seat-booked` event broadcasts immediately across all connected browsers viewing the same schedule, rendering the seat as Booked (`booked`) without requiring a manual page refresh.
+- **Direct Cancel Booking in Confirmation Details**: A dedicated **"Cancel Booking"** button is embedded in the post-booking details / boarding pass view. Clicking asks for confirmation, cancels the reservation in MongoDB, updates pass status to `Cancelled`, and broadcasts a `seat-cancelled` event to immediately make the seat available to other students.
+- **Reconnection & State Resiliency**: On connection drops or reconnections, the client automatically re-joins the room and pulls the latest seat occupancy directly from MongoDB.
+- **Live Collision Prevention**: If another student books the seat you currently have highlighted, your active selection is immediately released with an alert, preventing outdated submission attempts.
+
+### 4. 🛡️ Rock-Solid MongoDB Duplicate-Booking Prevention (Source of Truth)
+- **Compound Unique Database Constraint**: MongoDB enforces a partial unique compound index `{ slot: 1, date: 1, seatNumber: 1 }` scoped strictly to `{ status: 'Confirmed' }`.
+- **Atomic Concurrency Guarantee**: If two students click to reserve the identical seat at the exact same millisecond, MongoDB's atomic write lock guarantees that **only ONE reservation succeeds**; the competing attempt fails cleanly with an `E11000 duplicate key` / HTTP 409 conflict error.
+- **Verified Event Emission**: Socket.IO events are emitted **only after** MongoDB has successfully written and committed the booking or cancellation record.
+- **Strict Cancellation Integrity**: Validates that already-cancelled or ineligible bookings cannot be cancelled again.
+
+### 5. 🚌 RedBus Operational Efficiency
 - **Interactive Coach Blueprint**: Authentic 2x2 bus seating layout featuring driver cabin, door entrance, center aisle, window/aisle designations, and live seat occupancy status.
 - **Seat States**: Real-time visualization of Available (clean white), Selected (vibrant crimson), and Booked/Occupied (locked slate).
 - **Seat Availability Counter**: Immediate feedback on seats remaining for every departure time.
 - **Direction & Schedule Filters**: Instant filtering by shift (Morning, Afternoon, Evening) and direction (JKLU ➔ City Stops / City ➔ JKLU Campus).
 - **Streamlined Booking Steps**: Step-by-step RedBus stepper navigation connecting shuttle selection, stop selection, seat selection, passenger details, and boarding pass.
 
-### 4. 🍏 Apple Minimalism & Design
+### 6. 🍏 Apple Minimalism & Design
 - **Official Brand Favicon & Identity**: Custom vector and multi-resolution JKLU Shuttle bus badge matching the app's signature brand styling across browser tabs and devices.
 - **Frosted Glass Navigation**: Sticky glass header with live campus operations indicator.
 - **Segmented Control Tabs**: Seamless switching between **Book Shuttle**, **My Passes**, **Live Bus GPS**, and **Timetable**.
@@ -76,10 +89,15 @@ npm start
 ```
 *Frontend runs at `http://localhost:3000` in your web browser.*
 
-### 3. Run Tests & Production Build
+### 3. Run Real-Time Tests & Production Build
 
 ```bash
-cd JKLU-Shuttle-Management-system/client
+# Backend real-time Socket.IO and concurrency tests (9 tests)
+cd JKLU-Shuttle-Management-system/server
+npm test
+
+# Frontend React & real-time UI tests (23 tests across 4 suites)
+cd ../client
 npm test -- --watchAll=false
 npm run build
 ```

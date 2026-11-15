@@ -4,6 +4,7 @@ const Booking = require('../models/Booking');
 const Route = require('../models/Route');
 const { OFFICIAL_TRIPS } = require('../data/officialTrips');
 const defaultRoutes = require('../data/defaultRoutes');
+const { broadcastSeatBooked, broadcastSeatCancelled } = require('../socket');
 
 // Official JKLU 3 Shuttle Stops
 const JKLU_STOPS = [
@@ -239,8 +240,35 @@ exports.createBooking = async (req, res) => {
         status: 'Confirmed'
       });
 
-      await newBooking.save();
+      try {
+        await newBooking.save();
+      } catch (saveErr) {
+        // Compound unique index catch for simultaneous booking attempts
+        if (saveErr.code === 11000) {
+          return res.status(400).json({ message: `Seat ${parsedSeat} is already booked for this schedule.` });
+        }
+        throw saveErr;
+      }
+
       const populated = await Booking.findById(newBooking._id).populate('slot');
+
+      // Fetch all confirmed seats to broadcast updated availability
+      const confirmedBookings = await Booking.find({
+        slot: slotId,
+        date: bookingDate,
+        status: 'Confirmed'
+      }).select('seatNumber');
+      const bookedSeats = confirmedBookings.map(b => b.seatNumber);
+
+      // Broadcast real-time Socket.IO event ONLY after successful MongoDB save
+      broadcastSeatBooked({
+        slotId,
+        date: bookingDate,
+        seatNumber: parsedSeat,
+        bookedSeats,
+        booking: populated
+      });
+
       return res.status(201).json({ message: 'Shuttle seat booked successfully!', booking: populated });
     }
 
@@ -276,6 +304,19 @@ exports.createBooking = async (req, res) => {
     };
 
     memoryBookings.unshift(memBooking);
+
+    const memBooked = memoryBookings
+      .filter(b => (b.slotId === slotId || b.slot?._id === slotId) && b.date === bookingDate && b.status === 'Confirmed')
+      .map(b => b.seatNumber);
+
+    broadcastSeatBooked({
+      slotId,
+      date: bookingDate,
+      seatNumber: parsedSeat,
+      bookedSeats: memBooked,
+      booking: memBooking
+    });
+
     return res.status(201).json({ message: 'Shuttle seat booked successfully!', booking: memBooking });
   } catch (err) {
     console.error('createBooking error:', err);
@@ -310,14 +351,54 @@ exports.cancelBooking = async (req, res) => {
       if (!booking) {
         return res.status(404).json({ message: 'Booking not found' });
       }
+      if (booking.status === 'Cancelled') {
+        return res.status(400).json({ message: 'This booking is already cancelled.' });
+      }
       booking.status = 'Cancelled';
       await booking.save();
+
+      // Retrieve updated confirmed booked seats for this schedule
+      const remainingBookings = await Booking.find({
+        slot: booking.slot,
+        date: booking.date,
+        status: 'Confirmed'
+      }).select('seatNumber');
+      const bookedSeats = remainingBookings.map(b => b.seatNumber);
+
+      // Broadcast real-time Socket.IO event ONLY after successful MongoDB cancellation
+      broadcastSeatCancelled({
+        slotId: booking.slot,
+        date: booking.date,
+        seatNumber: booking.seatNumber,
+        bookedSeats,
+        bookingId: booking._id
+      });
+
       return res.json({ message: 'Booking cancelled successfully', booking });
     }
 
     const idx = memoryBookings.findIndex(b => b._id === bookingId);
     if (idx !== -1) {
+      if (memoryBookings[idx].status === 'Cancelled') {
+        return res.status(400).json({ message: 'This booking is already cancelled.' });
+      }
       memoryBookings[idx].status = 'Cancelled';
+      const slotId = memoryBookings[idx].slotId || memoryBookings[idx].slot?._id;
+      const date = memoryBookings[idx].date;
+      const seatNumber = memoryBookings[idx].seatNumber;
+
+      const memBooked = memoryBookings
+        .filter(b => (b.slotId === slotId || b.slot?._id === slotId) && b.date === date && b.status === 'Confirmed')
+        .map(b => b.seatNumber);
+
+      broadcastSeatCancelled({
+        slotId,
+        date,
+        seatNumber,
+        bookedSeats: memBooked,
+        bookingId: memoryBookings[idx]._id
+      });
+
       return res.json({ message: 'Booking cancelled successfully', booking: memoryBookings[idx] });
     }
 

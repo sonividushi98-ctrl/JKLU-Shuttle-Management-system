@@ -1,7 +1,9 @@
 const express = require('express');
+const http = require('http');
 const mongoose = require('mongoose');
 const cors = require('cors');
 require('dotenv').config();
+const { initSocket } = require('./socket');
 
 // Optional: DNS servers for Node to use, e.g. DNS_SERVERS=8.8.8.8,1.1.1.1
 // Needed on machines where Node cannot resolve the MongoDB Atlas SRV record.
@@ -11,7 +13,12 @@ if (process.env.DNS_SERVERS) {
 }
 
 const app = express();
+const server = http.createServer(app);
 const PORT = process.env.PORT || 5000;
+
+// Initialize Socket.IO with the HTTP server
+const io = initSocket(server);
+app.set('io', io);
 
 // Middleware
 app.use(cors());
@@ -43,6 +50,8 @@ mongoose.connect(MONGO_URI, {
     console.warn('! MongoDB connection note: Operating in graceful standalone / memory mode (' + err.message + ')');
   });
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+server.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT} (with Socket.IO enabled)`);
 });
+
+module.exports = { app, server };
